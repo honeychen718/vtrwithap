@@ -5,6 +5,7 @@
 #include "gp_setting.h"
 #include "SetupGrid.h"
 
+//hello github
 const t_ext_pin_util FULL_EXTERNAL_PIN_UTIL(1., 1.);
 
 bool vpr_start_new_cluster( VPR_CLB* clb,Group& group,t_packer_opts& packer_opts,
@@ -219,7 +220,7 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group,
 
     t_mode_selection_status mode_status;
     is_cluster_legal = try_intra_lb_route(router_data, packer_opts.pack_verbosity, &mode_status);
-    if (is_cluster_legal) {
+    if (is_cluster_legal) { 
         intra_lb_routing.push_back(router_data->saved_lb_nets);
         VTR_ASSERT((int)intra_lb_routing.size() == num_clb);
         router_data->saved_lb_nets = nullptr;
