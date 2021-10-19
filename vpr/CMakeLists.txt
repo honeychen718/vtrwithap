@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.9)
 
 project("vpr")
 
+#ADD_COMPILE_OPTIONS( -no-pie )
+set(CMAKE_EXE_LINKER_FLAGS "-no-pie")
+
 set(VPR_EXECUTION_ENGINE "auto" CACHE STRING "Specify the framework for (potential) parallel execution")
 set_property(CACHE VPR_EXECUTION_ENGINE PROPERTY STRINGS auto serial tbb)
 
@@ -74,6 +77,13 @@ endif()
 
 set_target_properties(libvpr PROPERTIES PREFIX "") #Avoid extra 'lib' prefix
 
+LINK_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/ripple/alg/patoh)
+#LINK_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/ripple/alg/lpsolve/lib64)
+#LINK_DIRECTORIES(/usr/lib/x86_64-linux-gnu)
+
+
+#TARGET_COMPILE_DEFINITIONS( libvpr "-no-pie" )
+
 #Specify link-time dependancies
 target_link_libraries(libvpr
                         libvtrutil
@@ -83,6 +93,10 @@ target_link_libraries(libvpr
                         libtatum
                         libargparse
                         libpugixml
+                        libpatoh.a
+                        lpsolve55
+                        boost_system
+                        dl
 )
 
 #link graphics library only when graphics set to on
@@ -128,6 +142,7 @@ if(${VTR_ENABLE_CAPNPROTO})
 endif()
 
 add_executable(vpr ${EXEC_SOURCES})
+#target_compile_options(vpr PRIVATE "-ldl")
 
 target_link_libraries(vpr libvpr)
 
@@ -260,7 +275,9 @@ file(GLOB_RECURSE TEST_SOURCES test/*.cpp)
 add_executable(test_vpr ${TEST_SOURCES})
 target_link_libraries(test_vpr
                         libcatch
-                        libvpr)
+                        libvpr
+                        libdl.a
+                        )
 
 #Supress IPO link warnings if IPO is enabled
 get_target_property(TEST_VPR_USES_IPO vpr INTERPROCEDURAL_OPTIMIZATION)

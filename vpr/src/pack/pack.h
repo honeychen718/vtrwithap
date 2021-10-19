@@ -17,4 +17,7 @@ float get_arch_switch_info(short switch_index, int switch_fanin, float& Tdel_swi
 
 std::unordered_set<AtomNetId> alloc_and_load_is_clock(bool global_clocks);
 
+t_pack_high_fanout_thresholds parse_high_fanout_thresholds(std::vector<std::string> specs);
+t_ext_pin_util_targets parse_target_external_pin_util(std::vector<std::string> specs);
+
 #endif

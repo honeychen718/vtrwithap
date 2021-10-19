@@ -1,0 +1,5 @@
+vpr_status=exited with return code 139
+vpr_seconds=1
+rundir=/home/jiabs/Documents/vtr-verilog-to-routing/vtr_work
+hostname=jiabs-Dell-Ubuntu
+error=

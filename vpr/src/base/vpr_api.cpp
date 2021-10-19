@@ -91,6 +91,8 @@
 #include "log.h"
 #include "iostream"
 
+#include "ripple_fpga_main.h"
+
 #ifdef VPR_USE_TBB
 #    include <tbb/task_scheduler_init.h>
 
@@ -364,6 +366,14 @@ bool vpr_flow(t_vpr_setup& vpr_setup, t_arch& arch) {
     if (vpr_setup.exit_before_pack) {
         VTR_LOG_WARN("Exiting before packing as requested.\n");
         return true;
+    }
+
+    {
+        bool ripple_success=ripple_fpga_main(vpr_setup,arch );
+
+        if(!ripple_success){
+            return false;
+        }
     }
 
     { //Pack

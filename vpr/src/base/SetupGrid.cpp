@@ -131,6 +131,29 @@ DeviceGrid create_device_grid(std::string layout_name, const std::vector<t_grid_
     }
 }
 
+
+///@brief Create the device grid for ripple FPGA
+DeviceGrid create_device_grid(std::string layout_name, const std::vector<t_grid_def>& grid_layouts){
+    auto cmp = [&](const t_grid_def& grid_def) {
+        return grid_def.name == layout_name;
+    };
+
+    auto iter = std::find_if(grid_layouts.begin(), grid_layouts.end(), cmp);
+    if (iter == grid_layouts.end()) {
+        //Not found
+        std::string valid_names;
+        for (size_t i = 0; i < grid_layouts.size(); ++i) {
+            if (i != 0) {
+                valid_names += ", ";
+            }
+            valid_names += "'" + grid_layouts[i].name + "'";
+        }
+        VPR_FATAL_ERROR(VPR_ERROR_ARCH, "Failed to find grid layout named '%s' (valid grid layouts: %s)\n", layout_name.c_str(), valid_names.c_str());
+    }
+
+    return build_device_grid(*iter, iter->width, iter->height);
+}
+
 /**
  * @brief Create a device grid which satisfies the minimum block counts
  *

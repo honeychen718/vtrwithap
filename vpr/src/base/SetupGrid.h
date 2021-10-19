@@ -21,6 +21,9 @@ DeviceGrid create_device_grid(std::string layout_name,
 ///@brief Find the device close in size to the specified dimensions
 DeviceGrid create_device_grid(std::string layout_name, const std::vector<t_grid_def>& grid_layouts, size_t min_width, size_t min_height);
 
+///@brief Create the device grid for ripple FPGA
+DeviceGrid create_device_grid(std::string layout_name, const std::vector<t_grid_def>& grid_layouts);
+
 /**
  * @brief Calculate the device utilization
  *
