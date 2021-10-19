@@ -28,10 +28,10 @@
 
 static bool try_size_device_grid(const t_arch& arch, const std::map<t_logical_block_type_ptr, size_t>& num_type_instances, float target_device_utilization, std::string device_layout_name);
 
-static t_ext_pin_util_targets parse_target_external_pin_util(std::vector<std::string> specs);
+// static t_ext_pin_util_targets parse_target_external_pin_util(std::vector<std::string> specs);
 static std::string target_external_pin_util_to_string(const t_ext_pin_util_targets& ext_pin_utils);
 
-static t_pack_high_fanout_thresholds parse_high_fanout_thresholds(std::vector<std::string> specs);
+//static t_pack_high_fanout_thresholds parse_high_fanout_thresholds(std::vector<std::string> specs);
 static std::string high_fanout_thresholds_to_string(const t_pack_high_fanout_thresholds& hf_thresholds);
 
 bool try_pack(t_packer_opts* packer_opts,
