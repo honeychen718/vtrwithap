@@ -46,12 +46,10 @@
 #include "vtr_math.h"
 #include "vtr_memory.h"
 
-#include "vpr_types.h"
 #include "vpr_error.h"
 
 #include "globals.h"
 #include "atom_netlist.h"
-#include "pack_types.h"
 #include "cluster.h"
 #include "output_clustering.h"
 #include "SetupGrid.h"
@@ -110,17 +108,6 @@ struct t_molecule_link {
     t_molecule_link* next;
 };
 
-struct t_molecule_stats {
-    int num_blocks = 0; //Number of blocks across all primitives in molecule
-
-    int num_pins = 0;        //Number of pins across all primitives in molecule
-    int num_input_pins = 0;  //Number of input pins across all primitives in molecule
-    int num_output_pins = 0; //Number of output pins across all primitives in molecule
-
-    int num_used_ext_pins = 0;    //Number of *used external* pins across all primitives in molecule
-    int num_used_ext_inputs = 0;  //Number of *used external* input pins across all primitives in molecule
-    int num_used_ext_outputs = 0; //Number of *used external* output pins across all primitives in molecule
-};
 
 /* Keeps a linked list of the unclustered blocks to speed up looking for *
  * unclustered blocks with a certain number of *external* inputs.        *
