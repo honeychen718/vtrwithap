@@ -76,4 +76,15 @@ void update_cluster_stats(const t_pack_molecule* molecule,
                                  const bool connection_driven,
                                  const int high_fanout_net_threshold,
                                  const SetupTimingInfo& timing_info);
+
+void update_le_count(const t_pb* pb, const t_logical_block_type_ptr logic_block_type, const t_pb_type* le_pb_type, std::vector<int>& le_count);
+
+t_logical_block_type_ptr identify_logic_block_type(std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types);
+
+t_pb_type* identify_le_block_type(t_logical_block_type_ptr logic_block_type);
+
+std::map<const t_model*, std::vector<t_logical_block_type_ptr>> identify_primitive_candidate_block_types();
+
+void free_pb_stats_recursive(t_pb* pb);
+
 #endif
