@@ -6,6 +6,8 @@
 #include "pack.h"
 #include "timing_info.h"
 
+extern t_molecule_link* unclustered_list_head;
+extern t_molecule_link* memory_pool;
 
 Legalizer* legalizer;
 //******************************************up
@@ -64,7 +66,7 @@ void gp_cong(vector<Group>& groups, int iteration ,t_vpr_setup& vpr_setup) {
     t_pack_molecule* molecule_head=list_of_pack_molecules.get();
 //*******************************************down
 
-//in do_clustering , berore while()
+//in do_clustering , before while()
 //********************************************up
     std::map<t_logical_block_type_ptr, size_t> num_used_type_instances;
 
@@ -120,6 +122,36 @@ void gp_cong(vector<Group>& groups, int iteration ,t_vpr_setup& vpr_setup) {
                         router_data,num_used_type_instances,is_clock,high_fanout_thresholds,timing_info,
                         target_external_pin_util,intra_lb_routing,clb_inter_blk_nets,logic_block_type,
                         le_pb_type,le_count,num_clb);
+    /****************************************************************
+     * Free Data Structures (after while in do_clustering)
+     *****************************************************************/
+    if((int)cluster_ctx.clb_nlist.blocks().size() != num_clb){
+        printlog(LOG_ERROR, "intra_lb_routing.size() != num_clb");
+    }
+    check_clustering();
+    ////output_clustering(intra_lb_routing, packer_opts.global_clocks, is_clock, arch->architecture_id, packer_opts.output_file.c_str(), false);
+    VTR_ASSERT(cluster_ctx.clb_nlist.blocks().size() == intra_lb_routing.size());
+    for (auto blk_id : cluster_ctx.clb_nlist.blocks())
+        free_intra_lb_nets(intra_lb_routing[blk_id]);
+
+    intra_lb_routing.clear();
+
+
+    free_cluster_placement_stats(cluster_placement_stats);
+
+    for (auto blk_id : cluster_ctx.clb_nlist.blocks())
+        cluster_ctx.clb_nlist.remove_block(blk_id);
+
+    cluster_ctx.clb_nlist = ClusteredNetlist();
+
+    free(unclustered_list_head);//check whethere unclustered_list_head is given value in alloc_and_init_clustering()
+    free(memory_pool);//same as up
+
+    free(primitives_list);
+
+
+
+    //******************************************************************
     legalizer->GetResult(NO_UPDATE);
     origHpwl = curHpwl = database.getHPWL();
     printlog(LOG_INFO, "**************");
