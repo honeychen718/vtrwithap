@@ -41,6 +41,11 @@ struct t_molecule_stats {
     int num_used_ext_outputs = 0; //Number of *used external* output pins across all primitives in molecule
 };
 
+struct t_molecule_link {
+    t_pack_molecule* moleculeptr;
+    t_molecule_link* next;
+};
+
 t_molecule_stats calc_max_molecules_stats(const t_pack_molecule* molecule_head);
 void mark_all_molecules_valid(t_pack_molecule* molecule_head);
 int count_molecules(t_pack_molecule* molecule_head);
@@ -86,5 +91,7 @@ t_pb_type* identify_le_block_type(t_logical_block_type_ptr logic_block_type);
 std::map<const t_model*, std::vector<t_logical_block_type_ptr>> identify_primitive_candidate_block_types();
 
 void free_pb_stats_recursive(t_pb* pb);
+
+void check_clustering();
 
 #endif

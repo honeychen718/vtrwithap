@@ -103,19 +103,19 @@ enum e_detailed_routing_stages {
 };
 
 /* Linked list structure.  Stores one integer (iblk). */
-struct t_molecule_link {
-    t_pack_molecule* moleculeptr;
-    t_molecule_link* next;
-};
+// struct t_molecule_link {
+//     t_pack_molecule* moleculeptr;
+//     t_molecule_link* next;
+// };
 
 
 /* Keeps a linked list of the unclustered blocks to speed up looking for *
  * unclustered blocks with a certain number of *external* inputs.        *
  * [0..lut_size].  Unclustered_list_head[i] points to the head of the    *
  * list of blocks with i inputs to be hooked up via external interconnect. */
-static t_molecule_link* unclustered_list_head;
+t_molecule_link* unclustered_list_head;
 int unclustered_list_head_size;
-static t_molecule_link* memory_pool; /*Declared here so I can free easily.*/
+t_molecule_link* memory_pool; /*Declared here so I can free easily.*/
 
 /* Does the atom block that drives the output of this atom net also appear as a   *
  * receiver (input) pin of the atom net? If so, then by how much?
@@ -307,7 +307,7 @@ static t_pack_molecule* get_molecule_for_cluster(t_pb* cur_pb,
                                                  ClusterBlockId cluster_index,
                                                  int verbosity);
 
-static void check_clustering();
+// static void check_clustering();
 
 static void echo_clusters(char* filename);
 
@@ -2602,7 +2602,7 @@ static t_pack_molecule* get_molecule_for_cluster(t_pb* cur_pb,
 }
 
 /* TODO: Add more error checking! */
-static void check_clustering() {
+void check_clustering() {
     std::unordered_set<AtomBlockId> atoms_checked;
     auto& atom_ctx = g_vpr_ctx.atom();
     auto& cluster_ctx = g_vpr_ctx.clustering();
