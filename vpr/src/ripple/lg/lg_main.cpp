@@ -5,7 +5,6 @@
 #include "gp_setting.h"
 #include "SetupGrid.h"
 
-//hello github
 const t_ext_pin_util FULL_EXTERNAL_PIN_UTIL(1., 1.);
 
 bool vpr_start_new_cluster( VPR_CLB* clb,Group& group,t_packer_opts& packer_opts,
@@ -133,14 +132,18 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group,
                                 bool fixDspRam,t_packer_opts& packer_opts,
                                  std::vector<t_lb_type_rr_node>* lb_type_rr_graphs,
                                  //t_pack_molecule* molecule_head,
-                                 std::multimap<AtomBlockId, t_pack_molecule*> atom_molecules,
+                                 std::multimap<AtomBlockId, t_pack_molecule*>& atom_molecules,
                                  t_cluster_placement_stats* cluster_placement_stats,
                                  t_pb_graph_node** primitives_list,
                                  int max_cluster_size,ClusteredNetlist* clb_nlist,t_lb_router_data* router_data,
-                                 std::map<t_logical_block_type_ptr, size_t> num_used_type_instances,
+                                 std::map<t_logical_block_type_ptr, size_t>& num_used_type_instances,
                                  const std::unordered_set<AtomNetId>& is_clock,
                                  const t_pack_high_fanout_thresholds& high_fanout_thresholds,
-                                 std::shared_ptr<SetupTimingInfo> timing_info,const t_ext_pin_util_targets& ext_pin_util_targets) {
+                                 std::shared_ptr<SetupTimingInfo> timing_info,const t_ext_pin_util_targets& ext_pin_util_targets,
+                                 vtr::vector<ClusterBlockId, std::vector<t_intra_lb_net>*>& intra_lb_routing,
+                                 vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
+                                 t_logical_block_type_ptr& logic_block_type,t_pb_type* le_pb_type,
+                                 std::vector<int>& le_count,int& num_clb) {
     if (site->pack == NULL) {
         database.place(database.addPack(site->type), site->x, site->y);
     }
@@ -177,6 +180,7 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group,
     t_ext_pin_util target_ext_pin_util;
     t_cluster_placement_stats *cur_cluster_placement_stats_ptr;
     PartitionRegion temp_cluster_pr;
+    auto& atom_ctx = g_vpr_ctx.atom();
     auto& cluster_ctx = g_vpr_ctx.mutable_clustering();
     ClusterBlockId clb_index(site->y * database.sitemap_nx+site->x);
     if(!site->hasclb){
@@ -187,6 +191,10 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group,
                                         atom_molecules,
                                         primitives_list,max_cluster_size,clb_index,clb_nlist,
                                         &router_data,num_used_type_instances);
+        if(success){
+            site->hasclb=true;
+            num_clb++;
+        }
     }else{
         cur_cluster_placement_stats_ptr = &cluster_placement_stats[cluster_ctx.clb_nlist.block_type(clb_index)->index];
         block_pack_status = try_pack_molecule(cur_cluster_placement_stats_ptr,
@@ -222,17 +230,20 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group,
     is_cluster_legal = try_intra_lb_route(router_data, packer_opts.pack_verbosity, &mode_status);
     if (is_cluster_legal) { 
         intra_lb_routing.push_back(router_data->saved_lb_nets);
-        VTR_ASSERT((int)intra_lb_routing.size() == num_clb);
+        //VTR_ASSERT((int)intra_lb_routing.size() == num_clb);
+        if((int)intra_lb_routing.size() != num_clb){
+            printlog(LOG_ERROR, "intra_lb_routing.size() != num_clb");
+        }
         router_data->saved_lb_nets = nullptr;
 
         //Pick a new seed
-        istart = get_highest_gain_seed_molecule(&seedindex, atom_molecules, seed_atoms);
+        //istart = get_highest_gain_seed_molecule(&seedindex, atom_molecules, seed_atoms);
 
-        if (packer_opts.timing_driven) {
-            if (num_blocks_hill_added > 0) {
-                blocks_since_last_analysis += num_blocks_hill_added;
-            }
-        }
+        // if (packer_opts.timing_driven) {
+        //     if (num_blocks_hill_added > 0) {
+        //         blocks_since_last_analysis += num_blocks_hill_added;
+        //     }
+        // }
 
         /* store info that will be used later in packing from pb_stats and free the rest */
         t_pb_stats* pb_stats = cluster_ctx.clb_nlist.block_pb(clb_index)->pb_stats;
@@ -259,7 +270,7 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group,
         cluster_ctx.clb_nlist.remove_block(clb_index);
         cluster_ctx.clb_nlist.compress();
         num_clb--;
-        seedindex = savedseedindex;
+        //seedindex = savedseedindex;
     }
     free_router_data(router_data);
     router_data = nullptr;
@@ -518,14 +529,18 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
                         lgGroupOrder groupOrder,
                         t_packer_opts* packer_opts,////these two are member of vpr_setup
                         std::vector<t_lb_type_rr_node>* lb_type_rr_graphs,//these two are member of vpr_setup
-                        std::multimap<AtomBlockId, t_pack_molecule*> atom_molecules,
+                        std::multimap<AtomBlockId, t_pack_molecule*>& atom_molecules,
                         t_cluster_placement_stats* cluster_placement_stats,
                         t_pb_graph_node** primitives_list,
                         int max_cluster_size,ClusteredNetlist* clb_nlist,t_lb_router_data* router_data,
-                        std::map<t_logical_block_type_ptr, size_t> num_used_type_instances,
+                        std::map<t_logical_block_type_ptr, size_t>& num_used_type_instances,
                         const std::unordered_set<AtomNetId>& is_clock,const t_pack_high_fanout_thresholds& high_fanout_thresholds,
                         std::shared_ptr<SetupTimingInfo> timing_info,
-                        const t_ext_pin_util_targets& ext_pin_util_targets) {
+                        const t_ext_pin_util_targets& ext_pin_util_targets,
+                        vtr::vector<ClusterBlockId, std::vector<t_intra_lb_net>*>& intra_lb_routing,
+                        vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
+                        t_logical_block_type_ptr& logic_block_type,t_pb_type* le_pb_type,
+                        std::vector<int>& le_count,int& num_clb) {
     const int MAX_WIN = 1000;
 
     // SortGroupsByPins();
@@ -606,7 +621,9 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
                 curSite = candSites[s];
                 if (MergeGroupToSite(   curSite, group, false,*packer_opts,lb_type_rr_graphs,atom_molecules,cluster_placement_stats,
                                         primitives_list,max_cluster_size,clb_nlist,router_data,num_used_type_instances,
-                                        is_clock,high_fanout_thresholds,timing_info,ext_pin_util_targets)
+                                        is_clock,high_fanout_thresholds,timing_info,ext_pin_util_targets,intra_lb_routing,
+                                        clb_inter_blk_nets,logic_block_type,
+                                        le_pb_type,le_count,num_clb)
                     ) {
                     isPlaced = true;
                     lgData.PartialUpdate(group, curSite);

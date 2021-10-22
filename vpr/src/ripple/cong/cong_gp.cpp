@@ -76,7 +76,14 @@ void gp_cong(vector<Group>& groups, int iteration ,t_vpr_setup& vpr_setup) {
     auto& device_ctx = g_vpr_ctx.mutable_device();
     auto& cluster_ctx = g_vpr_ctx.mutable_clustering();
 
+    vtr::vector<ClusterBlockId, std::vector<t_intra_lb_net>*> intra_lb_routing;
+
     std::shared_ptr<SetupTimingInfo> timing_info;
+
+    std::vector<int> le_count(3, 0);
+    int num_clb = 0;
+
+    vtr::vector<ClusterBlockId, std::vector<AtomNetId>> clb_inter_blk_nets(atom_ctx.nlist.blocks().size());
 
     const t_molecule_stats max_molecule_stats = calc_max_molecules_stats(molecule_head);
     mark_all_molecules_valid(molecule_head);
@@ -100,13 +107,19 @@ void gp_cong(vector<Group>& groups, int iteration ,t_vpr_setup& vpr_setup) {
     alloc_and_init_clustering(max_molecule_stats,
                               &cluster_placement_stats, &primitives_list, molecule_head,
                               num_molecules);
+    auto primitive_candidate_block_types = identify_primitive_candidate_block_types();
+    // find the cluster type that has lut primitives
+    auto logic_block_type = identify_logic_block_type(primitive_candidate_block_types);
+    // find a LE pb_type within the found logic_block_type
+    auto le_pb_type = identify_le_block_type(logic_block_type);
 
 
 //******************************************down
     legalizer->RunAll(  SITE_HPWL_SMALL_WIN, DEFAULT,packer_opts,lb_type_rr_graphs,atom_molecules,
                         cluster_placement_stats,primitives_list,max_cluster_size,&cluster_ctx.clb_nlist,
                         router_data,num_used_type_instances,is_clock,high_fanout_thresholds,timing_info,
-                        target_external_pin_util);
+                        target_external_pin_util,intra_lb_routing,clb_inter_blk_nets,logic_block_type,
+                        le_pb_type,le_count,num_clb);
     legalizer->GetResult(NO_UPDATE);
     origHpwl = curHpwl = database.getHPWL();
     printlog(LOG_INFO, "**************");

@@ -22,13 +22,17 @@ private:
     bool MergeGroupToSite(  Site *site, Group &group, bool fixDspRam ,
                             t_packer_opts& packer_opts,
                             std::vector<t_lb_type_rr_node>* lb_type_rr_graphs,
-                            std::multimap<AtomBlockId, t_pack_molecule*> atom_molecules,
+                            std::multimap<AtomBlockId, t_pack_molecule*>& atom_molecules,
                             t_cluster_placement_stats* cluster_placement_stats,
                             t_pb_graph_node** primitives_list,
                             int max_cluster_size,ClusteredNetlist* clb_nlist,
-                            t_lb_router_data* router_data,std::map<t_logical_block_type_ptr, size_t> num_used_type_instances,
+                            t_lb_router_data* router_data,std::map<t_logical_block_type_ptr, size_t>& num_used_type_instances,
                             const std::unordered_set<AtomNetId>& is_clock,const t_pack_high_fanout_thresholds& high_fanout_thresholds,
-                            std::shared_ptr<SetupTimingInfo> timing_info,const t_ext_pin_util_targets& ext_pin_util_targets);
+                            std::shared_ptr<SetupTimingInfo> timing_info,const t_ext_pin_util_targets& ext_pin_util_targets,
+                            vtr::vector<ClusterBlockId, std::vector<t_intra_lb_net>*>& intra_lb_routing,
+                            vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
+                            t_logical_block_type_ptr& logic_block_type,t_pb_type* le_pb_type,
+                            std::vector<int>& le_count,int& num_clb);
     bool AssignPackToSite(Site *site, Group &group);
 
     void SortCandSitesByHpwl(vector<Site *> &candSites, const Group &group);
@@ -53,13 +57,17 @@ public:
     bool RunAll(lgSiteOrder siteOrder, lgGroupOrder groupOrder,
                 t_packer_opts* packer_opts,
                 std::vector<t_lb_type_rr_node>* lb_type_rr_graphs,
-                std::multimap<AtomBlockId, t_pack_molecule*> atom_molecules,
+                std::multimap<AtomBlockId, t_pack_molecule*>& atom_molecules,
                 t_cluster_placement_stats* cluster_placement_stats,
                 t_pb_graph_node** primitives_list,
                 int max_cluster_size,ClusteredNetlist* clb_nlist,
-                t_lb_router_data* router_data,std::map<t_logical_block_type_ptr, size_t> num_used_type_instances,
+                t_lb_router_data* router_data,std::map<t_logical_block_type_ptr, size_t>& num_used_type_instances,
                 const std::unordered_set<AtomNetId>& is_clock,const t_pack_high_fanout_thresholds& high_fanout_thresholds,
-                std::shared_ptr<SetupTimingInfo> timing_info,const t_ext_pin_util_targets& ext_pin_util_targets);
+                std::shared_ptr<SetupTimingInfo> timing_info,const t_ext_pin_util_targets& ext_pin_util_targets,
+                vtr::vector<ClusterBlockId, std::vector<t_intra_lb_net>*>& intra_lb_routing,
+                vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
+                t_logical_block_type_ptr& logic_block_type,t_pb_type* le_pb_type,
+                std::vector<int>& le_count,int& num_clb);
     void RunPartial();
 
     double GetHpwl();

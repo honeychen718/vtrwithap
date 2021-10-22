@@ -148,7 +148,7 @@ static void add_molecule_to_pb_stats_candidates(t_pack_molecule* molecule,
 //                                       t_pack_molecule* molecules_head,
 //                                       int num_molecules);
 
-static void free_pb_stats_recursive(t_pb* pb);
+// static void free_pb_stats_recursive(t_pb* pb);
 
 static void try_update_lookahead_pins_used(t_pb* cur_pb);
 
@@ -340,7 +340,7 @@ static void load_transitive_fanout_candidates(ClusterBlockId cluster_index,
                                               vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
                                               int transitive_fanout_threshold);
 
-static std::map<const t_model*, std::vector<t_logical_block_type_ptr>> identify_primitive_candidate_block_types();
+// static std::map<const t_model*, std::vector<t_logical_block_type_ptr>> identify_primitive_candidate_block_types();
 
 static void update_molecule_chain_info(t_pack_molecule* chain_molecule, const t_pb_graph_node* root_primitive);
 
@@ -352,13 +352,13 @@ static t_pb_graph_pin* get_driver_pb_graph_pin(const t_pb* driver_pb, const Atom
 
 static size_t update_pb_type_count(const t_pb* pb, std::map<t_pb_type*, int>& pb_type_count, size_t depth);
 
-static void update_le_count(const t_pb* pb, const t_logical_block_type_ptr logic_block_type, const t_pb_type* le_pb_type, std::vector<int>& le_count);
+// static void update_le_count(const t_pb* pb, const t_logical_block_type_ptr logic_block_type, const t_pb_type* le_pb_type, std::vector<int>& le_count);
 
 static void print_pb_type_count_recurr(t_pb_type* type, size_t max_name_chars, size_t curr_depth, std::map<t_pb_type*, int>& pb_type_count);
 
-static t_logical_block_type_ptr identify_logic_block_type(std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types);
+// static t_logical_block_type_ptr identify_logic_block_type(std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types);
 
-static t_pb_type* identify_le_block_type(t_logical_block_type_ptr logic_block_type);
+// static t_pb_type* identify_le_block_type(t_logical_block_type_ptr logic_block_type);
 
 static bool pb_used_for_blif_model(const t_pb* pb, std::string blif_model_name);
 
@@ -1021,7 +1021,7 @@ void alloc_and_init_clustering(const t_molecule_stats& max_molecule_stats,
 }
 
 /*****************************************/
-static void free_pb_stats_recursive(t_pb* pb) {
+void free_pb_stats_recursive(t_pb* pb) {
     int i, j;
     /* Releases all the memory used by clustering data structures.   */
     if (pb) {
@@ -3532,7 +3532,7 @@ static void load_transitive_fanout_candidates(ClusterBlockId clb_index,
     }
 }
 
-static std::map<const t_model*, std::vector<t_logical_block_type_ptr>> identify_primitive_candidate_block_types() {
+std::map<const t_model*, std::vector<t_logical_block_type_ptr>> identify_primitive_candidate_block_types() {
     std::map<const t_model*, std::vector<t_logical_block_type_ptr>> model_candidates;
     auto& atom_ctx = g_vpr_ctx.atom();
     auto& atom_nlist = atom_ctx.nlist;
@@ -3758,7 +3758,7 @@ static void print_pb_type_count_recurr(t_pb_type* pb_type, size_t max_name_chars
  * This function identifies the logic block type which is
  * defined by the block type which has a lut primitive
  */
-static t_logical_block_type_ptr identify_logic_block_type(std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types) {
+t_logical_block_type_ptr identify_logic_block_type(std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types) {
     std::string lut_name = ".names";
 
     for (auto& model : primitive_candidate_block_types) {
@@ -3776,7 +3776,7 @@ static t_logical_block_type_ptr identify_logic_block_type(std::map<const t_model
  * is found by searching a cluster type to find the first pb_type (from the top
  * of the hierarchy clb->LE) that has more than one instance within the cluster.
  */
-static t_pb_type* identify_le_block_type(t_logical_block_type_ptr logic_block_type) {
+t_pb_type* identify_le_block_type(t_logical_block_type_ptr logic_block_type) {
     // if there is no CLB-like cluster, then there is no LE pb_block
     if (!logic_block_type)
         return nullptr;
@@ -3803,7 +3803,7 @@ static t_pb_type* identify_le_block_type(t_logical_block_type_ptr logic_block_ty
 /**
  * This function updates the le_count data structure from the given packed cluster
  */
-static void update_le_count(const t_pb* pb, const t_logical_block_type_ptr logic_block_type, const t_pb_type* le_pb_type, std::vector<int>& le_count) {
+void update_le_count(const t_pb* pb, const t_logical_block_type_ptr logic_block_type, const t_pb_type* le_pb_type, std::vector<int>& le_count) {
     // if this cluster doesn't contain LEs or there
     // are no les in this architecture, ignore it
     if (!logic_block_type || pb->pb_graph_node != logic_block_type->pb_graph_head || !le_pb_type)
