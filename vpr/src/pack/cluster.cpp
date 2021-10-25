@@ -2069,7 +2069,7 @@ static void update_total_gain(float alpha, float beta, bool timing_driven, bool 
 }
 
 /*****************************************/
-static void update_cluster_stats(const t_pack_molecule* molecule,
+void update_cluster_stats(const t_pack_molecule* molecule,
                                  const ClusterBlockId clb_index,
                                  const std::unordered_set<AtomNetId>& is_clock,
                                  const std::unordered_set<AtomNetId>& is_global,

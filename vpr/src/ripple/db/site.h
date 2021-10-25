@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../global.h"
+#include "pack_types.h"
 
 namespace db {
 

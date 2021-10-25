@@ -192,6 +192,8 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group,
                                         primitives_list,max_cluster_size,clb_index,clb_nlist,
                                         &router_data,num_used_type_instances);
         if(success){
+            site->router_data=router_data;
+            router_data=nullptr;
             site->hasclb=true;
             num_clb++;
         }
@@ -206,7 +208,7 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group,
                                         max_cluster_size,
                                         clb_index,
                                         1,//detailed_routing_stage set to 1
-                                        router_data,
+                                        site->router_data,
                                         packer_opts.pack_verbosity,
                                         packer_opts.enable_pin_feasibility_filter,
                                         packer_opts.feasible_block_array_size,

@@ -10,6 +10,7 @@
 #include "atom_netlist_fwd.h"
 #include "pack_types.h"
 #include "vpr_types.h"
+#include "timing_info.h"
 
 std::map<t_logical_block_type_ptr, size_t> do_clustering(const t_packer_opts& packer_opts,
                                                          const t_analysis_opts& analysis_opts,

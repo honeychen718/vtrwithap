@@ -305,7 +305,7 @@ static bool try_size_device_grid(const t_arch& arch, const std::map<t_logical_bl
     return fits_on_device;
 }
 
-static t_ext_pin_util_targets parse_target_external_pin_util(std::vector<std::string> specs) {
+t_ext_pin_util_targets parse_target_external_pin_util(std::vector<std::string> specs) {
     t_ext_pin_util_targets targets(1., 1.);
 
     if (specs.size() == 1 && specs[0] == "auto") {
@@ -439,7 +439,7 @@ static std::string target_external_pin_util_to_string(const t_ext_pin_util_targe
     return ss.str();
 }
 
-static t_pack_high_fanout_thresholds parse_high_fanout_thresholds(std::vector<std::string> specs) {
+t_pack_high_fanout_thresholds parse_high_fanout_thresholds(std::vector<std::string> specs) {
     t_pack_high_fanout_thresholds high_fanout_thresholds(128);
 
     if (specs.size() == 1 && specs[0] == "auto") {
