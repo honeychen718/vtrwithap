@@ -32,7 +32,9 @@ private:
                             vtr::vector<ClusterBlockId, std::vector<t_intra_lb_net>*>& intra_lb_routing,
                             vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
                             t_logical_block_type_ptr& logic_block_type,t_pb_type* le_pb_type,
-                            std::vector<int>& le_count,int& num_clb);
+                            std::vector<int>& le_count,int& num_clb,
+                            const std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types,
+                            bool balance_block_type_utilization);
     bool AssignPackToSite(Site *site, Group &group);
 
     void SortCandSitesByHpwl(vector<Site *> &candSites, const Group &group);
@@ -67,7 +69,9 @@ public:
                 vtr::vector<ClusterBlockId, std::vector<t_intra_lb_net>*>& intra_lb_routing,
                 vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
                 t_logical_block_type_ptr& logic_block_type,t_pb_type* le_pb_type,
-                std::vector<int>& le_count,int& num_clb);
+                std::vector<int>& le_count,int& num_clb,
+                const std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types,
+                bool balance_block_type_utilization);
     void RunPartial();
 
     double GetHpwl();

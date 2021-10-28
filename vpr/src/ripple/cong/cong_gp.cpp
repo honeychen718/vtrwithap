@@ -20,7 +20,7 @@ t_pack_molecule* TurnGroupsIntoMolecules(vector<Group>& groups,
     for(Group& group:groups){
         cur_molecule = new t_pack_molecule;
         cur_molecule->valid = true;
-        cur_molecule->type = MOLECULE_FORCED_PACK;
+        cur_molecule->type = MOLECULE_TRANSFORMED_FROM_GROUP;
         cur_molecule->atom_block_ids = std::vector<AtomBlockId>(group.instances.size()); //Initializes invalid
         cur_molecule->num_blocks = group.instances.size();
         //cur_molecule->root = 0;
@@ -28,10 +28,12 @@ t_pack_molecule* TurnGroupsIntoMolecules(vector<Group>& groups,
             Instance* &inst = group.instances[i];
             cur_molecule->atom_block_ids[i]=inst->vpratomblkid;
             atom_molecules.insert({inst->vpratomblkid, cur_molecule});
+            //cout<<Master::NameEnum2String(inst->master->name)<<"\t";
         }
         cur_molecule->next = list_of_molecules_head;
         list_of_molecules_head = cur_molecule;
         group.vpr_molecule=cur_molecule;
+        //cout<<endl;
 
     }
 
@@ -64,6 +66,20 @@ void gp_cong(vector<Group>& groups, int iteration ,t_vpr_setup& vpr_setup) {
     t_ext_pin_util_targets target_external_pin_util = parse_target_external_pin_util(packer_opts->target_external_pin_util);
     t_pack_high_fanout_thresholds high_fanout_thresholds = parse_high_fanout_thresholds(packer_opts->high_fanout_threshold);
     t_pack_molecule* molecule_head=list_of_pack_molecules.get();
+
+    // bool allow_unrelated_clustering = false;
+    // if (packer_opts->allow_unrelated_clustering == e_unrelated_clustering::ON) {
+    //     allow_unrelated_clustering = true;
+    // } else if (packer_opts->allow_unrelated_clustering == e_unrelated_clustering::OFF) {
+    //     allow_unrelated_clustering = false;
+    // }
+
+    bool balance_block_type_util = false;
+    if (packer_opts->balance_block_type_utilization == e_balance_block_type_util::ON) {
+        balance_block_type_util = true;
+    } else if (packer_opts->balance_block_type_utilization == e_balance_block_type_util::OFF) {
+        balance_block_type_util = false;
+    }
 //*******************************************down
 
 //in do_clustering , before while()
@@ -121,7 +137,8 @@ void gp_cong(vector<Group>& groups, int iteration ,t_vpr_setup& vpr_setup) {
                         cluster_placement_stats,primitives_list,max_cluster_size,&cluster_ctx.clb_nlist,
                         router_data,num_used_type_instances,is_clock,high_fanout_thresholds,timing_info,
                         target_external_pin_util,intra_lb_routing,clb_inter_blk_nets,logic_block_type,
-                        le_pb_type,le_count,num_clb);
+                        le_pb_type,le_count,num_clb,primitive_candidate_block_types,
+                        balance_block_type_util);
     /****************************************************************
      * Free Data Structures (after while in do_clustering)
      *****************************************************************/

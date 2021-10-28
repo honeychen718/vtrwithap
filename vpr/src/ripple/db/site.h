@@ -53,6 +53,7 @@ public:
     int w, h;
     Site();
     Site(int x, int y, SiteType *sitetype);
+    ~Site();
     // center
     inline double cx() { return x + 0.5 * w; }
     inline double cy() { return y + 0.5 * h; }
@@ -61,6 +62,8 @@ public:
     bool hasclb;
     ClusterBlockId clb_index;
     t_lb_router_data* router_data;
+    PartitionRegion temp_cluster_pr;
+
 };
 
 class Pack {

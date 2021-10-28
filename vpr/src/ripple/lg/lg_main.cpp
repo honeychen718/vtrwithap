@@ -4,6 +4,7 @@
 #include "lg_dp_utils.h"
 #include "gp_setting.h"
 #include "SetupGrid.h"
+#include "vtr_math.h"
 
 const t_ext_pin_util FULL_EXTERNAL_PIN_UTIL(1., 1.);
 
@@ -13,20 +14,58 @@ bool vpr_start_new_cluster( VPR_CLB* clb,Group& group,t_packer_opts& packer_opts
                             const std::multimap<AtomBlockId, t_pack_molecule*>& atom_molecules,
                             t_pb_graph_node** primitives_list, int max_cluster_size,ClusterBlockId clb_index,
                             ClusteredNetlist* clb_nlist,t_lb_router_data** router_data,
-                            std::map<t_logical_block_type_ptr, size_t>& num_used_type_instances){
-    bool success=false;
+                            std::map<t_logical_block_type_ptr, size_t>& num_used_type_instances,
+                            const std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types,
+                            PartitionRegion& temp_cluster_pr,
+                            bool balance_block_type_utilization){
+    
 
     auto& atom_ctx = g_vpr_ctx.atom();
     auto& device_ctx = g_vpr_ctx.mutable_device();
     auto& floorplanning_ctx = g_vpr_ctx.mutable_floorplanning();
 
-    t_pb* &pb = clb->pb;
+    /*Cluster's PartitionRegion is empty initially, meaning it has no floorplanning constraints*/
+    PartitionRegion empty_pr;
+    floorplanning_ctx.cluster_constraints.push_back(empty_pr);
 
-    PartitionRegion temp_cluster_pr;
-
+    /* Allocate a dummy initial cluster and load a atom block as a seed and check if it is legal */
     AtomBlockId root_atom = group.vpr_molecule->atom_block_ids[group.vpr_molecule->root];
     const std::string& root_atom_name = atom_ctx.nlist.block_name(root_atom);
+    const t_model* root_model = atom_ctx.nlist.block_model(root_atom);
+    
+    auto itr = primitive_candidate_block_types.find(root_model);
+    VTR_ASSERT(itr != primitive_candidate_block_types.end());
+    //std::vector<t_logical_block_type_ptr> candidate_types = itr->second;
+    clb->block_types = itr->second;
 
+    if (balance_block_type_utilization) {
+        //We sort the candidate types in ascending order by their current utilization.
+        //This means that the packer will prefer to use types with lower utilization.
+        //This is a naive approach to try balancing utilization when multiple types can
+        //support the same primitive(s).
+        std::stable_sort(clb->block_types.begin(), clb->block_types.end(),
+                         [&](t_logical_block_type_ptr lhs, t_logical_block_type_ptr rhs) {
+                             int lhs_num_instances = 0;
+                             int rhs_num_instances = 0;
+                             // Count number of instances for each type
+                             for (auto type : lhs->equivalent_tiles)
+                                 lhs_num_instances += device_ctx.grid.num_instances(type);
+                             for (auto type : rhs->equivalent_tiles)
+                                 rhs_num_instances += device_ctx.grid.num_instances(type);
+
+                             float lhs_util = vtr::safe_ratio<float>(num_used_type_instances[lhs], lhs_num_instances);
+                             float rhs_util = vtr::safe_ratio<float>(num_used_type_instances[rhs], rhs_num_instances);
+                             //Lower util first
+                             return lhs_util < rhs_util;
+                         });
+    }
+    
+    
+    t_pb* &pb = clb->pb;
+
+    //PartitionRegion temp_cluster_pr;
+
+    bool success=false;
     for (size_t i = 0; i < clb->block_types.size(); i++) {
         auto type =clb->block_types[i];
         pb = new t_pb;
@@ -71,8 +110,10 @@ bool vpr_start_new_cluster( VPR_CLB* clb,Group& group,t_packer_opts& packer_opts
         }
     }
 
-    if(!success) printlog(LOG_ERROR, "invalid instance type");
-
+    if(!success) {
+        printlog(LOG_ERROR, "vpr_start_new_cluster failed!!");
+        std::abort();
+    }
     //Successfully create cluster
     auto block_type = clb_nlist->block_type(clb_index);
     num_used_type_instances[block_type]++;
@@ -143,7 +184,9 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group,
                                  vtr::vector<ClusterBlockId, std::vector<t_intra_lb_net>*>& intra_lb_routing,
                                  vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
                                  t_logical_block_type_ptr& logic_block_type,t_pb_type* le_pb_type,
-                                 std::vector<int>& le_count,int& num_clb) {
+                                 std::vector<int>& le_count,int& num_clb,
+                                 const std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types,
+                                 bool balance_block_type_utilization) {
     if (site->pack == NULL) {
         database.place(database.addPack(site->type), site->x, site->y);
     }
@@ -179,7 +222,7 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group,
     enum e_block_pack_status block_pack_status;
     t_ext_pin_util target_ext_pin_util;
     t_cluster_placement_stats *cur_cluster_placement_stats_ptr;
-    PartitionRegion temp_cluster_pr;
+    //PartitionRegion temp_cluster_pr;
     auto& atom_ctx = g_vpr_ctx.atom();
     auto& cluster_ctx = g_vpr_ctx.mutable_clustering();
     ClusterBlockId clb_index(site->y * database.sitemap_nx+site->x);
@@ -190,7 +233,8 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group,
                                         cluster_placement_stats,
                                         atom_molecules,
                                         primitives_list,max_cluster_size,clb_index,clb_nlist,
-                                        &router_data,num_used_type_instances);
+                                        &router_data,num_used_type_instances,primitive_candidate_block_types,
+                                        site->temp_cluster_pr,balance_block_type_utilization);
         if(success){
             site->router_data=router_data;
             router_data=nullptr;
@@ -213,11 +257,11 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group,
                                         packer_opts.enable_pin_feasibility_filter,
                                         packer_opts.feasible_block_array_size,
                                         target_ext_pin_util,
-                                        temp_cluster_pr);
-
+                                        site->temp_cluster_pr);
     }
-    
-    int high_fanout_threshold = high_fanout_thresholds.get_threshold(cluster_ctx.clb_nlist.block_type(clb_index)->name);
+    //if(high_fanout_thresholds != NULL) cout<<1<<endl;
+    cout<<1<<endl;
+    int high_fanout_threshold =  high_fanout_thresholds.get_threshold(cluster_ctx.clb_nlist.block_type(clb_index)->name);
     target_ext_pin_util = ext_pin_util_targets.get_pin_util(cluster_ctx.clb_nlist.block_type(clb_index)->name);
     update_cluster_stats(group.vpr_molecule, clb_index,
                             is_clock, //Set of clock nets
@@ -542,7 +586,9 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
                         vtr::vector<ClusterBlockId, std::vector<t_intra_lb_net>*>& intra_lb_routing,
                         vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
                         t_logical_block_type_ptr& logic_block_type,t_pb_type* le_pb_type,
-                        std::vector<int>& le_count,int& num_clb) {
+                        std::vector<int>& le_count,int& num_clb,
+                        const std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types,
+                        bool balance_block_type_utilization) {
     const int MAX_WIN = 1000;
 
     // SortGroupsByPins();
@@ -625,7 +671,8 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
                                         primitives_list,max_cluster_size,clb_nlist,router_data,num_used_type_instances,
                                         is_clock,high_fanout_thresholds,timing_info,ext_pin_util_targets,intra_lb_routing,
                                         clb_inter_blk_nets,logic_block_type,
-                                        le_pb_type,le_count,num_clb)
+                                        le_pb_type,le_count,num_clb,primitive_candidate_block_types,
+                                        balance_block_type_utilization)
                     ) {
                     isPlaced = true;
                     lgData.PartialUpdate(group, curSite);

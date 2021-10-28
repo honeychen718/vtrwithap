@@ -38,7 +38,8 @@ static void update_primitive_cost_or_status(const t_pb_graph_node* pb_graph_node
                                             const bool valid);
 static float try_place_molecule(const t_pack_molecule* molecule,
                                 t_pb_graph_node* root,
-                                t_pb_graph_node** primitives_list);
+                                t_pb_graph_node** primitives_list,
+                                t_cluster_placement_stats* &cluster_placement_stats);
 static bool expand_forced_pack_molecule_placement(const t_pack_molecule* molecule,
                                                   const t_pack_pattern_block* pack_pattern_block,
                                                   t_pb_graph_node** primitives_list,
@@ -151,7 +152,7 @@ bool get_next_primitive_list(t_cluster_placement_stats* cluster_placement_stats,
                     break;
                 }
                 /* try place molecule at root location cur */
-                cost = try_place_molecule(molecule, cur->pb_graph_node, primitives_list);
+                cost = try_place_molecule(molecule, cur->pb_graph_node, primitives_list,cluster_placement_stats);
                 // if the cost is lower than the best, or is equal to the best but this
                 // primitive is more available in the cluster mark it as the best primitive
                 if (cost < lowest_cost || (best && cost == lowest_cost && cur->pb_graph_node->total_primitive_count > best->pb_graph_node->total_primitive_count)) {
@@ -171,7 +172,7 @@ bool get_next_primitive_list(t_cluster_placement_stats* cluster_placement_stats,
         }
     } else {
         /* populate primitive list with best */
-        cost = try_place_molecule(molecule, best->pb_graph_node, primitives_list);
+        cost = try_place_molecule(molecule, best->pb_graph_node, primitives_list,cluster_placement_stats);
         VTR_ASSERT(cost == lowest_cost);
 
         /* take out best node and put it in flight */
@@ -432,7 +433,8 @@ static void update_primitive_cost_or_status(const t_pb_graph_node* pb_graph_node
  */
 static float try_place_molecule(const t_pack_molecule* molecule,
                                 t_pb_graph_node* root,
-                                t_pb_graph_node** primitives_list) {
+                                t_pb_graph_node** primitives_list,
+                                t_cluster_placement_stats* &cluster_placement_stats) {
     int list_size, i;
     float cost = HUGE_POSITIVE_FLOAT;
     list_size = get_array_size_of_molecule(molecule);
@@ -451,6 +453,19 @@ static float try_place_molecule(const t_pack_molecule* molecule,
                                                            molecule->pack_pattern->root_block, primitives_list,
                                                            &cost)) {
                     return HUGE_POSITIVE_FLOAT;
+                }
+            }else if(molecule->type == MOLECULE_TRANSFORMED_FROM_GROUP){
+                for(int s = 0; s < list_size; s++){
+                    if(primitives_list[s] == nullptr){
+                        for (i = 0; i < cluster_placement_stats->num_pb_types; i++) {
+                            if (cluster_placement_stats->valid_primitives[i]->next_primitive == nullptr) {
+                                continue; /* no more primitives of this type available */
+                            }
+                            if (primitive_type_feasible(molecule->atom_block_ids[s],cluster_placement_stats->valid_primitives[i]->next_primitive->pb_graph_node->pb_type)) {
+                                primitives_list[s]=cluster_placement_stats->valid_primitives[i]->next_primitive->pb_graph_node;
+                            }
+                        }
+                    }
                 }
             }
             for (i = 0; i < list_size; i++) {

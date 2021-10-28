@@ -384,7 +384,8 @@ struct t_pb_route {
 ///@brief Describes the molecule type
 enum e_pack_pattern_molecule_type {
     MOLECULE_SINGLE_ATOM, ///<single atom forming a molecule (no pack pattern associated)
-    MOLECULE_FORCED_PACK  ///<more than one atom representing a packing pattern forming a large molecule
+    MOLECULE_FORCED_PACK, ///<more than one atom representing a packing pattern forming a large molecule
+    MOLECULE_TRANSFORMED_FROM_GROUP//add by jia
 };
 
 /**

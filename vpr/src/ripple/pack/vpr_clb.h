@@ -6,6 +6,7 @@ class VPR_CLB{
 private:
     ClusterBlockId clb_id;
 public:
+    ~VPR_CLB();
     bool AddInsts(const Group& group){}
     bool AddInsts(const Group& group,t_vpr_setup& vpr_setup);
     inline bool IsEmpty(){}

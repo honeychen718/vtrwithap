@@ -107,6 +107,10 @@ Site::Site(int x, int y, SiteType *sitetype) {
     this->pack = NULL;
 }
 
+Site::~Site() {
+    delete router_data;
+}
+
 /***** Pack *****/
 
 Pack::Pack() {
