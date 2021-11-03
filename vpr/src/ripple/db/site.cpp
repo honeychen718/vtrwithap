@@ -96,6 +96,7 @@ Site::Site() {
     y = -1;
     w = 0;
     h = 0;
+    //hasclb=false;//add by jia 
 }
 
 Site::Site(int x, int y, SiteType *sitetype) {
@@ -105,11 +106,12 @@ Site::Site(int x, int y, SiteType *sitetype) {
     this->h = 1;
     this->type = sitetype;
     this->pack = NULL;
+    //hasclb=false;//add by jia
 }
 
-Site::~Site() {
-    delete router_data;
-}
+// Site::~Site() {
+//     delete router_data;
+// }
 
 /***** Pack *****/
 

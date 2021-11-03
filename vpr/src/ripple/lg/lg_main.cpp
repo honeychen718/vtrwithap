@@ -8,12 +8,12 @@
 
 const t_ext_pin_util FULL_EXTERNAL_PIN_UTIL(1., 1.);
 
-bool vpr_start_new_cluster( VPR_CLB* clb,Group& group,t_packer_opts& packer_opts,
-                            std::vector<t_lb_type_rr_node>* lb_type_rr_graphs,
-                            t_cluster_placement_stats* cluster_placement_stats,
+bool vpr_start_new_cluster( VPR_CLB* &clb,Group& group,t_packer_opts& packer_opts,
+                            std::vector<t_lb_type_rr_node>* &lb_type_rr_graphs,
+                            t_cluster_placement_stats* &cluster_placement_stats,
                             const std::multimap<AtomBlockId, t_pack_molecule*>& atom_molecules,
                             t_pb_graph_node** primitives_list, int max_cluster_size,ClusterBlockId clb_index,
-                            ClusteredNetlist* clb_nlist,t_lb_router_data** router_data,
+                            ClusteredNetlist* &clb_nlist,t_lb_router_data* &router_data,
                             std::map<t_logical_block_type_ptr, size_t>& num_used_type_instances,
                             const std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types,
                             PartitionRegion& temp_cluster_pr,
@@ -72,7 +72,7 @@ bool vpr_start_new_cluster( VPR_CLB* clb,Group& group,t_packer_opts& packer_opts
         pb->pb_graph_node = type->pb_graph_head;
         alloc_and_load_pb_stats(pb, packer_opts.feasible_block_array_size);
         pb->parent_pb = nullptr;
-        *router_data=alloc_and_load_router_data(&lb_type_rr_graphs[type->index], type);
+        router_data=alloc_and_load_router_data(&lb_type_rr_graphs[type->index], type);
 
         e_block_pack_status pack_result = BLK_STATUS_UNDEFINED;
         for (int j = 0; j < type->pb_graph_head->pb_type->num_modes && !success; j++) {
@@ -85,7 +85,7 @@ bool vpr_start_new_cluster( VPR_CLB* clb,Group& group,t_packer_opts& packer_opts
                                 group.vpr_molecule, primitives_list, pb,
                                 gpSetting.num_models, max_cluster_size, clb_index,
                                 1,//detailed_routing_stage, set to 1 for now
-                                *router_data,
+                                router_data,
                                 packer_opts.pack_verbosity,
                                 packer_opts.enable_pin_feasibility_filter,
                                 packer_opts.feasible_block_array_size,
@@ -103,10 +103,10 @@ bool vpr_start_new_cluster( VPR_CLB* clb,Group& group,t_packer_opts& packer_opts
             break;
         } else {
         //Free failed clustering and try again
-            free_router_data(*router_data);
+            free_router_data(router_data);
             free_pb(pb);
             delete pb;
-            *router_data = nullptr;
+            router_data = nullptr;
         }
     }
 
@@ -176,11 +176,11 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group,
                                  std::multimap<AtomBlockId, t_pack_molecule*>& atom_molecules,
                                  t_cluster_placement_stats* cluster_placement_stats,
                                  t_pb_graph_node** primitives_list,
-                                 int max_cluster_size,ClusteredNetlist* clb_nlist,t_lb_router_data* router_data,
+                                 int max_cluster_size,ClusteredNetlist* clb_nlist,
                                  std::map<t_logical_block_type_ptr, size_t>& num_used_type_instances,
                                  const std::unordered_set<AtomNetId>& is_clock,
                                  const t_pack_high_fanout_thresholds& high_fanout_thresholds,
-                                 std::shared_ptr<SetupTimingInfo> timing_info,const t_ext_pin_util_targets& ext_pin_util_targets,
+                                 std::shared_ptr<SetupTimingInfo>& timing_info,const t_ext_pin_util_targets& ext_pin_util_targets,
                                  vtr::vector<ClusterBlockId, std::vector<t_intra_lb_net>*>& intra_lb_routing,
                                  vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
                                  t_logical_block_type_ptr& logic_block_type,t_pb_type* le_pb_type,
@@ -225,23 +225,25 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group,
     //PartitionRegion temp_cluster_pr;
     auto& atom_ctx = g_vpr_ctx.atom();
     auto& cluster_ctx = g_vpr_ctx.mutable_clustering();
-    ClusterBlockId clb_index(site->y * database.sitemap_nx+site->x);
-    if(!site->hasclb){
-
-        site->clb_index=clb_index;
-        success=vpr_start_new_cluster(  lgData.clbMap[site->x][site->y],group,packer_opts,lb_type_rr_graphs,
+    VPR_CLB* &clb = lgData.clbMap[site->x][site->y];
+    ClusterBlockId clb_index;
+    t_lb_router_data* &router_data = clb->router_data;
+    if(!clb->valid){
+        clb_index=(ClusterBlockId)num_clb;
+        success=vpr_start_new_cluster(  clb,group,packer_opts,lb_type_rr_graphs,
                                         cluster_placement_stats,
                                         atom_molecules,
                                         primitives_list,max_cluster_size,clb_index,clb_nlist,
-                                        &router_data,num_used_type_instances,primitive_candidate_block_types,
-                                        site->temp_cluster_pr,balance_block_type_utilization);
+                                        router_data,num_used_type_instances,primitive_candidate_block_types,
+                                        clb->temp_cluster_pr,balance_block_type_utilization);
         if(success){
-            site->router_data=router_data;
-            router_data=nullptr;
-            site->hasclb=true;
+            //router_data=nullptr;
+            clb->valid=true;
+            clb->index=clb_index;
             num_clb++;
         }
     }else{
+        clb_index=clb->index;
         cur_cluster_placement_stats_ptr = &cluster_placement_stats[cluster_ctx.clb_nlist.block_type(clb_index)->index];
         block_pack_status = try_pack_molecule(cur_cluster_placement_stats_ptr,
                                         atom_molecules,
@@ -252,15 +254,16 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group,
                                         max_cluster_size,
                                         clb_index,
                                         1,//detailed_routing_stage set to 1
-                                        site->router_data,
+                                        clb->router_data,
                                         packer_opts.pack_verbosity,
                                         packer_opts.enable_pin_feasibility_filter,
                                         packer_opts.feasible_block_array_size,
                                         target_ext_pin_util,
-                                        site->temp_cluster_pr);
+                                        clb->temp_cluster_pr);
     }
     //if(high_fanout_thresholds != NULL) cout<<1<<endl;
-    cout<<1<<endl;
+    //cout<<1<<endl;
+    //auto block_type = clb_nlist->block_type(clb_index);
     int high_fanout_threshold =  high_fanout_thresholds.get_threshold(cluster_ctx.clb_nlist.block_type(clb_index)->name);
     target_ext_pin_util = ext_pin_util_targets.get_pin_util(cluster_ctx.clb_nlist.block_type(clb_index)->name);
     update_cluster_stats(group.vpr_molecule, clb_index,
@@ -318,8 +321,8 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group,
         num_clb--;
         //seedindex = savedseedindex;
     }
-    free_router_data(router_data);
-    router_data = nullptr;
+    //free_router_data(router_data);
+    //router_data = nullptr;//? necessary?
     
 
     
@@ -573,15 +576,15 @@ bool Legalizer::RunAll(lgSiteOrder siteOrder, lgGroupOrder groupOrder) {
 
 bool Legalizer::RunAll( lgSiteOrder siteOrder, 
                         lgGroupOrder groupOrder,
-                        t_packer_opts* packer_opts,////these two are member of vpr_setup
+                        t_packer_opts& packer_opts,////these two are member of vpr_setup
                         std::vector<t_lb_type_rr_node>* lb_type_rr_graphs,//these two are member of vpr_setup
                         std::multimap<AtomBlockId, t_pack_molecule*>& atom_molecules,
                         t_cluster_placement_stats* cluster_placement_stats,
                         t_pb_graph_node** primitives_list,
-                        int max_cluster_size,ClusteredNetlist* clb_nlist,t_lb_router_data* router_data,
+                        int max_cluster_size,ClusteredNetlist* clb_nlist,
                         std::map<t_logical_block_type_ptr, size_t>& num_used_type_instances,
                         const std::unordered_set<AtomNetId>& is_clock,const t_pack_high_fanout_thresholds& high_fanout_thresholds,
-                        std::shared_ptr<SetupTimingInfo> timing_info,
+                        std::shared_ptr<SetupTimingInfo>& timing_info,
                         const t_ext_pin_util_targets& ext_pin_util_targets,
                         vtr::vector<ClusterBlockId, std::vector<t_intra_lb_net>*>& intra_lb_routing,
                         vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
@@ -667,8 +670,8 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
 
             for (unsigned s = 0; !isPlaced && s < candSites.size(); s++) {
                 curSite = candSites[s];
-                if (MergeGroupToSite(   curSite, group, false,*packer_opts,lb_type_rr_graphs,atom_molecules,cluster_placement_stats,
-                                        primitives_list,max_cluster_size,clb_nlist,router_data,num_used_type_instances,
+                if (MergeGroupToSite(   curSite, group, false,packer_opts,lb_type_rr_graphs,atom_molecules,cluster_placement_stats,
+                                        primitives_list,max_cluster_size,clb_nlist,num_used_type_instances,
                                         is_clock,high_fanout_thresholds,timing_info,ext_pin_util_targets,intra_lb_routing,
                                         clb_inter_blk_nets,logic_block_type,
                                         le_pb_type,le_count,num_clb,primitive_candidate_block_types,

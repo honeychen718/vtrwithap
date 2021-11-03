@@ -76,7 +76,7 @@ static void print_pack_molecules(const char* fname,
                                  const int num_pack_patterns,
                                  const t_pack_molecule* list_of_molecules);
 
-static t_pb_graph_node* get_expected_lowest_cost_primitive_for_atom_block(const AtomBlockId blk_id);
+// static t_pb_graph_node* get_expected_lowest_cost_primitive_for_atom_block(const AtomBlockId blk_id);
 
 static t_pb_graph_node* get_expected_lowest_cost_primitive_for_atom_block_in_pb_graph_node(const AtomBlockId blk_id, t_pb_graph_node* curr_pb_graph_node, float* cost);
 
@@ -1206,7 +1206,7 @@ static void print_pack_molecules(const char* fname,
 }
 
 /* Search through all primitives and return the lowest cost primitive that fits this atom block */
-static t_pb_graph_node* get_expected_lowest_cost_primitive_for_atom_block(const AtomBlockId blk_id) {
+t_pb_graph_node* get_expected_lowest_cost_primitive_for_atom_block(const AtomBlockId blk_id) {
     float cost, best_cost;
     t_pb_graph_node *current, *best;
     auto& device_ctx = g_vpr_ctx.device();

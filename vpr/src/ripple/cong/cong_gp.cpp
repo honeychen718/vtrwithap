@@ -5,6 +5,11 @@
 #include "prepack.h"
 #include "pack.h"
 #include "timing_info.h"
+//#include "timing_reports.h"
+#include "PreClusterDelayCalculator.h"
+#include "PreClusterTimingGraphResolver.h"
+#include "tatum/TimingReporter.hpp"
+#include "vtr_error.h"
 
 extern t_molecule_link* unclustered_list_head;
 extern t_molecule_link* memory_pool;
@@ -37,6 +42,26 @@ t_pack_molecule* TurnGroupsIntoMolecules(vector<Group>& groups,
 
     }
 
+    for (auto blk_id : g_vpr_ctx.atom().nlist.blocks()) {
+        t_pb_graph_node* best = get_expected_lowest_cost_primitive_for_atom_block(blk_id);
+        if (!best) {
+            /* Free the molecules in the linked list to avoid memory leakage */
+            cur_molecule = list_of_molecules_head;
+            while (cur_molecule) {
+                t_pack_molecule* molecule_to_free = cur_molecule;
+                cur_molecule = cur_molecule->next;
+                delete molecule_to_free;
+            }
+
+            VPR_FATAL_ERROR(VPR_ERROR_PACK, "Failed to find any location to pack primitive of type '%s' in architecture",
+                            g_vpr_ctx.atom().nlist.block_model(blk_id)->name);
+        }
+
+        VTR_ASSERT_SAFE(nullptr != best);
+
+        expected_lowest_cost_pb_gnode[blk_id] = best;
+    }
+
     return list_of_molecules_head;
 }
 //******************************************down
@@ -52,19 +77,20 @@ void gp_cong(vector<Group>& groups, int iteration ,t_vpr_setup& vpr_setup) {
 
 //before do_clustering
 //******************************************up
-    t_packer_opts* packer_opts = &vpr_setup.PackerOpts;
+    t_packer_opts &packer_opts = vpr_setup.PackerOpts;
+    const t_analysis_opts& analysis_opts = vpr_setup.AnalysisOpts;
     std::vector<t_lb_type_rr_node>* lb_type_rr_graphs=vpr_setup.PackerRRGraph;
     std::unordered_set<AtomNetId> is_clock;
     std::multimap<AtomBlockId, t_pack_molecule*> atom_molecules;
     std::unordered_map<AtomBlockId, t_pb_graph_node*> expected_lowest_cost_pb_gnode;
     std::unique_ptr<t_pack_molecule, decltype(&free_pack_molecules)> list_of_pack_molecules(nullptr, free_pack_molecules);
-    is_clock = alloc_and_load_is_clock(packer_opts->global_clocks);
+    is_clock = alloc_and_load_is_clock(packer_opts.global_clocks);
     
     list_of_pack_molecules.reset(TurnGroupsIntoMolecules(groups,
                                                         atom_molecules,
                                                         expected_lowest_cost_pb_gnode));
-    t_ext_pin_util_targets target_external_pin_util = parse_target_external_pin_util(packer_opts->target_external_pin_util);
-    t_pack_high_fanout_thresholds high_fanout_thresholds = parse_high_fanout_thresholds(packer_opts->high_fanout_threshold);
+    t_ext_pin_util_targets target_external_pin_util = parse_target_external_pin_util(packer_opts.target_external_pin_util);
+    t_pack_high_fanout_thresholds high_fanout_thresholds = parse_high_fanout_thresholds(packer_opts.high_fanout_threshold);
     t_pack_molecule* molecule_head=list_of_pack_molecules.get();
 
     // bool allow_unrelated_clustering = false;
@@ -75,9 +101,9 @@ void gp_cong(vector<Group>& groups, int iteration ,t_vpr_setup& vpr_setup) {
     // }
 
     bool balance_block_type_util = false;
-    if (packer_opts->balance_block_type_utilization == e_balance_block_type_util::ON) {
+    if (packer_opts.balance_block_type_utilization == e_balance_block_type_util::ON) {
         balance_block_type_util = true;
-    } else if (packer_opts->balance_block_type_utilization == e_balance_block_type_util::OFF) {
+    } else if (packer_opts.balance_block_type_utilization == e_balance_block_type_util::OFF) {
         balance_block_type_util = false;
     }
 //*******************************************down
@@ -88,7 +114,6 @@ void gp_cong(vector<Group>& groups, int iteration ,t_vpr_setup& vpr_setup) {
 
     t_cluster_placement_stats *cluster_placement_stats;
     t_pb_graph_node** primitives_list;
-    t_lb_router_data* router_data = nullptr;
 
     auto& atom_ctx = g_vpr_ctx.atom();
     auto& device_ctx = g_vpr_ctx.mutable_device();
@@ -96,6 +121,7 @@ void gp_cong(vector<Group>& groups, int iteration ,t_vpr_setup& vpr_setup) {
 
     vtr::vector<ClusterBlockId, std::vector<t_intra_lb_net>*> intra_lb_routing;
 
+    std::shared_ptr<PreClusterDelayCalculator> clustering_delay_calc;
     std::shared_ptr<SetupTimingInfo> timing_info;
 
     std::vector<int> le_count(3, 0);
@@ -131,11 +157,59 @@ void gp_cong(vector<Group>& groups, int iteration ,t_vpr_setup& vpr_setup) {
     // find a LE pb_type within the found logic_block_type
     auto le_pb_type = identify_le_block_type(logic_block_type);
 
+    //Default criticalities set to zero (e.g. if not timing driven)
+    vtr::vector<AtomBlockId, float> atom_criticality(atom_ctx.nlist.blocks().size(), 0.);
+
+    if (packer_opts.timing_driven) {
+        /*
+         * Initialize the timing analyzer
+         */
+        clustering_delay_calc = std::make_shared<PreClusterDelayCalculator>(atom_ctx.nlist, atom_ctx.lookup, packer_opts.inter_cluster_net_delay, expected_lowest_cost_pb_gnode);
+        timing_info = make_setup_timing_info(clustering_delay_calc, packer_opts.timing_update_type);
+
+        //Calculate the initial timing
+        timing_info->update();
+
+        // if (isEchoFileEnabled(E_ECHO_PRE_PACKING_TIMING_GRAPH)) {
+        //     auto& timing_ctx = g_vpr_ctx.timing();
+        //     tatum::write_echo(getEchoFileName(E_ECHO_PRE_PACKING_TIMING_GRAPH),
+        //                       *timing_ctx.graph, *timing_ctx.constraints, *clustering_delay_calc, timing_info->analyzer());
+
+        //     tatum::NodeId debug_tnode = id_or_pin_name_to_tnode(analysis_opts.echo_dot_timing_graph_node);
+        //     write_setup_timing_graph_dot(getEchoFileName(E_ECHO_PRE_PACKING_TIMING_GRAPH) + std::string(".dot"),
+        //                                  *timing_info, debug_tnode);
+        // }
+
+        {
+            auto& timing_ctx = g_vpr_ctx.timing();
+            PreClusterTimingGraphResolver resolver(atom_ctx.nlist,
+                                                   atom_ctx.lookup, *timing_ctx.graph, *clustering_delay_calc);
+            resolver.set_detail_level(analysis_opts.timing_report_detail);
+
+            tatum::TimingReporter timing_reporter(resolver, *timing_ctx.graph,
+                                                  *timing_ctx.constraints);
+
+            timing_reporter.report_timing_setup(
+                "pre_pack.report_timing.setup.rpt",
+                *timing_info->setup_analyzer(),
+                analysis_opts.timing_report_npaths);
+        }
+
+        //Calculate true criticalities of each block
+        for (AtomBlockId blk : atom_ctx.nlist.blocks()) {
+            for (AtomPinId in_pin : atom_ctx.nlist.block_input_pins(blk)) {
+                //Max criticality over incoming nets
+                float crit = timing_info->setup_pin_criticality(in_pin);
+                atom_criticality[blk] = std::max(atom_criticality[blk], crit);
+            }
+        }
+    }
+
 
 //******************************************down
     legalizer->RunAll(  SITE_HPWL_SMALL_WIN, DEFAULT,packer_opts,lb_type_rr_graphs,atom_molecules,
                         cluster_placement_stats,primitives_list,max_cluster_size,&cluster_ctx.clb_nlist,
-                        router_data,num_used_type_instances,is_clock,high_fanout_thresholds,timing_info,
+                        num_used_type_instances,is_clock,high_fanout_thresholds,timing_info,
                         target_external_pin_util,intra_lb_routing,clb_inter_blk_nets,logic_block_type,
                         le_pb_type,le_count,num_clb,primitive_candidate_block_types,
                         balance_block_type_util);

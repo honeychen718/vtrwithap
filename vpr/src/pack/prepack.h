@@ -22,4 +22,7 @@ t_pack_molecule* alloc_and_load_pack_molecules(t_pack_patterns* list_of_pack_pat
 
 void free_pack_molecules(t_pack_molecule* list_of_pack_molecules);
 
+t_pb_graph_node* get_expected_lowest_cost_primitive_for_atom_block(const AtomBlockId blk_id);
+
+
 #endif

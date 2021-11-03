@@ -6,6 +6,7 @@ class VPR_CLB{
 private:
     ClusterBlockId clb_id;
 public:
+    VPR_CLB();
     ~VPR_CLB();
     bool AddInsts(const Group& group){}
     bool AddInsts(const Group& group,t_vpr_setup& vpr_setup);
@@ -20,4 +21,9 @@ public:
     t_cluster_placement_stats *cluster_placement_stats;
     //bool IsEmpty(){return pb == nullptr;}
     bool AddInsts();
+    //add by jia 
+    bool valid;
+    ClusterBlockId index;
+    t_lb_router_data* router_data;
+    PartitionRegion temp_cluster_pr;
 };
