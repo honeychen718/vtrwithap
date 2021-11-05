@@ -10,6 +10,7 @@ VPR_CLB::VPR_CLB(){
 }
 
 VPR_CLB::~VPR_CLB(){
-    delete pb;
+    //delete pb;
     delete router_data;
+    cout<<"this clb "<<"deconstructed"<<endl;
 }

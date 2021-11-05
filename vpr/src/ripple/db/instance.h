@@ -47,7 +47,8 @@ public:
 // TODO: rename to Cell
 class Instance {
 public:
-    AtomBlockId vpratomblkid;
+    t_pack_molecule* vpr_molecule;
+    AtomBlockId vpratomblkid;//add by jia
     int id;
     string name;
     Master *master;

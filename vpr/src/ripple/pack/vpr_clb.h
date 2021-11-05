@@ -16,10 +16,12 @@ public:
     void Print() const{}
     
 public:
-    t_pb* pb;
+    //t_pb* pb;
     std::vector<t_logical_block_type_ptr> block_types;//VPR type
-    t_cluster_placement_stats *cluster_placement_stats;
+    //std::map<int,t_cluster_placement_stats*> type_index_to_cluster_placement_stats;
+    //t_cluster_placement_stats *cluster_placement_stats;
     //bool IsEmpty(){return pb == nullptr;}
+    t_cluster_placement_stats* cluster_placement_stats;
     bool AddInsts();
     //add by jia 
     bool valid;

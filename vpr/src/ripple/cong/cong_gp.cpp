@@ -21,7 +21,7 @@ t_pack_molecule* TurnGroupsIntoMolecules(vector<Group>& groups,
                                         std::unordered_map<AtomBlockId, t_pb_graph_node*>& expected_lowest_cost_pb_gnode){
     t_pack_molecule* list_of_molecules_head;
     t_pack_molecule* cur_molecule;
-    cur_molecule = list_of_molecules_head = nullptr;
+    cur_molecule = list_of_molecules_head = nullptr;/*
     for(Group& group:groups){
         cur_molecule = new t_pack_molecule;
         cur_molecule->valid = true;
@@ -40,7 +40,24 @@ t_pack_molecule* TurnGroupsIntoMolecules(vector<Group>& groups,
         group.vpr_molecule=cur_molecule;
         //cout<<endl;
 
+    }*/
+    for(Group& group:groups){
+        for(int i=0; i<group.instances.size(); ++i){
+            AtomBlockId &blk_id=group.instances[i]->vpratomblkid;
+            cur_molecule = new t_pack_molecule;
+            cur_molecule->valid = true;
+            cur_molecule->type = MOLECULE_SINGLE_ATOM;
+            cur_molecule->atom_block_ids = std::vector<AtomBlockId>(1); //Initializes invalid
+            cur_molecule->num_blocks = 1;
+            cur_molecule->root = 0;
+            cur_molecule->atom_block_ids[0]=blk_id;
+            atom_molecules.insert({blk_id, cur_molecule});
+            cur_molecule->next = list_of_molecules_head;
+            list_of_molecules_head = cur_molecule;
+            group.instances[i]->vpr_molecule=cur_molecule;
+        }
     }
+
 
     for (auto blk_id : g_vpr_ctx.atom().nlist.blocks()) {
         t_pb_graph_node* best = get_expected_lowest_cost_primitive_for_atom_block(blk_id);
@@ -151,6 +168,7 @@ void gp_cong(vector<Group>& groups, int iteration ,t_vpr_setup& vpr_setup) {
     alloc_and_init_clustering(max_molecule_stats,
                               &cluster_placement_stats, &primitives_list, molecule_head,
                               num_molecules);
+    free_cluster_placement_stats(cluster_placement_stats);
     auto primitive_candidate_block_types = identify_primitive_candidate_block_types();
     // find the cluster type that has lut primitives
     auto logic_block_type = identify_logic_block_type(primitive_candidate_block_types);
@@ -208,7 +226,7 @@ void gp_cong(vector<Group>& groups, int iteration ,t_vpr_setup& vpr_setup) {
 
 //******************************************down
     legalizer->RunAll(  SITE_HPWL_SMALL_WIN, DEFAULT,packer_opts,lb_type_rr_graphs,atom_molecules,
-                        cluster_placement_stats,primitives_list,max_cluster_size,&cluster_ctx.clb_nlist,
+                        primitives_list,max_cluster_size,&cluster_ctx.clb_nlist,
                         num_used_type_instances,is_clock,high_fanout_thresholds,timing_info,
                         target_external_pin_util,intra_lb_routing,clb_inter_blk_nets,logic_block_type,
                         le_pb_type,le_count,num_clb,primitive_candidate_block_types,
@@ -228,7 +246,6 @@ void gp_cong(vector<Group>& groups, int iteration ,t_vpr_setup& vpr_setup) {
     intra_lb_routing.clear();
 
 
-    free_cluster_placement_stats(cluster_placement_stats);
 
     for (auto blk_id : cluster_ctx.clb_nlist.blocks())
         cluster_ctx.clb_nlist.remove_block(blk_id);

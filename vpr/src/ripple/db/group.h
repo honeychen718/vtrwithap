@@ -28,6 +28,6 @@ public:
     static void WriteGroups(const vector<Group>& groups, const string& fileNamePreFix);
     static void ReadGroups(vector<Group>& groups, const string& fileNamePreFix);
 
-    t_pack_molecule* vpr_molecule;
+    
 };
 }  // namespace db

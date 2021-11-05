@@ -455,16 +455,31 @@ static float try_place_molecule(const t_pack_molecule* molecule,
                     return HUGE_POSITIVE_FLOAT;
                 }
             }else if(molecule->type == MOLECULE_TRANSFORMED_FROM_GROUP){
+                std::map<char*,int> type_num;
                 for(int s = 0; s < list_size; s++){
                     if(primitives_list[s] == nullptr){
                         for (i = 0; i < cluster_placement_stats->num_pb_types; i++) {
-                            if (cluster_placement_stats->valid_primitives[i]->next_primitive == nullptr) {
+                            t_cluster_placement_primitive* next_primitive=cluster_placement_stats->valid_primitives[i]->next_primitive;
+                            if (next_primitive == nullptr) {
                                 continue; /* no more primitives of this type available */
                             }
-                            if (primitive_type_feasible(molecule->atom_block_ids[s],cluster_placement_stats->valid_primitives[i]->next_primitive->pb_graph_node->pb_type)) {
-                                primitives_list[s]=cluster_placement_stats->valid_primitives[i]->next_primitive->pb_graph_node;
+                            if (primitive_type_feasible(molecule->atom_block_ids[s],next_primitive->pb_graph_node->pb_type)) {
+                                char* name=next_primitive->pb_graph_node->pb_type->name;
+                                if(type_num.find(name)==type_num.end()){
+                                    type_num.insert(std::make_pair(name,1));
+                                }else{
+                                    for(int i = 0;i<type_num[name];i++){
+                                        next_primitive=next_primitive->next_primitive;
+                                    }
+                                    type_num[name]++;
+                                }
+                                primitives_list[s]=next_primitive->pb_graph_node;
+                                cost += next_primitive->pb_graph_node->cluster_placement_primitive->base_cost + next_primitive->pb_graph_node->cluster_placement_primitive->incremental_cost;
+                                break;
                             }
                         }
+                    }else{    
+                        type_num.insert(std::make_pair(primitives_list[s]->pb_type->name,1));
                     }
                 }
             }
