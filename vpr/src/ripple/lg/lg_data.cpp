@@ -305,11 +305,6 @@ void LGData::GetResult(lgRetrunGroup retGroup) {//todo: a lot!!!!!!!!!!
                 clbMap[x][y]->GetResult(tmpGroup);
                 for (int i = 0; i < numresourceinslice; i++) {
                     if (tmpGroup.instances[i] != NULL) {
-                        //
-                        // if(tmpGroup.instances[i]->id==260){
-                        //     cout<<"here"<<endl;
-                        // }
-                        //
                         database.place(tmpGroup.instances[i], database.getSite(x, y), i);
                     }
                 }
