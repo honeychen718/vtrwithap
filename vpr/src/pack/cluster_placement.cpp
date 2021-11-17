@@ -44,10 +44,14 @@ static bool expand_forced_pack_molecule_placement(const t_pack_molecule* molecul
                                                   const t_pack_pattern_block* pack_pattern_block,
                                                   t_pb_graph_node** primitives_list,
                                                   float* cost);
+static bool expand_ripple_molecule_placement(const t_pack_molecule* molecule,
+                                             const t_pb_graph_node* root_pb_graph_node,
+                                             t_pb_graph_node** primitives_list,
+                                             float* cost);
 static t_pb_graph_pin* expand_pack_molecule_pin_edge(const int pattern_id,
                                                      const t_pb_graph_pin* cur_pin,
                                                      const bool forward);
-static void flush_intermediate_queues(t_cluster_placement_stats* cluster_placement_stats);
+// static void flush_intermediate_queues(t_cluster_placement_stats* cluster_placement_stats);
 
 /****************************************/
 /*Function Definitions					*/
@@ -455,33 +459,38 @@ static float try_place_molecule(const t_pack_molecule* molecule,
                     return HUGE_POSITIVE_FLOAT;
                 }
             }else if(molecule->type == MOLECULE_TRANSFORMED_FROM_GROUP){
-                std::map<char*,int> type_num;
-                for(int s = 0; s < list_size; s++){
-                    if(primitives_list[s] == nullptr){
-                        for (i = 0; i < cluster_placement_stats->num_pb_types; i++) {
-                            t_cluster_placement_primitive* next_primitive=cluster_placement_stats->valid_primitives[i]->next_primitive;
-                            if (next_primitive == nullptr) {
-                                continue; /* no more primitives of this type available */
-                            }
-                            if (primitive_type_feasible(molecule->atom_block_ids[s],next_primitive->pb_graph_node->pb_type)) {
-                                char* name=next_primitive->pb_graph_node->pb_type->name;
-                                if(type_num.find(name)==type_num.end()){
-                                    type_num.insert(std::make_pair(name,1));
-                                }else{
-                                    for(int i = 0;i<type_num[name];i++){
-                                        next_primitive=next_primitive->next_primitive;
-                                    }
-                                    type_num[name]++;
-                                }
-                                primitives_list[s]=next_primitive->pb_graph_node;
-                                cost += next_primitive->pb_graph_node->cluster_placement_primitive->base_cost + next_primitive->pb_graph_node->cluster_placement_primitive->incremental_cost;
-                                break;
-                            }
-                        }
-                    }else{    
-                        type_num.insert(std::make_pair(primitives_list[s]->pb_type->name,1));
-                    }
+                if (!expand_ripple_molecule_placement(molecule,
+                                                      root,primitives_list,
+                                                      &cost)) {
+                    return HUGE_POSITIVE_FLOAT;
                 }
+                //std::map<char*,int> type_num;
+                // for(int s = 0; s < list_size; s++){
+                //     if(primitives_list[s] == nullptr){
+                //         for (i = 0; i < cluster_placement_stats->num_pb_types; i++) {
+                //             t_cluster_placement_primitive* next_primitive=cluster_placement_stats->valid_primitives[i]->next_primitive;
+                //             if (next_primitive == nullptr) {
+                //                 continue; /* no more primitives of this type available */
+                //             }
+                //             if (primitive_type_feasible(molecule->atom_block_ids[s],next_primitive->pb_graph_node->pb_type)) {
+                //                 char* name=next_primitive->pb_graph_node->pb_type->name;
+                //                 if(type_num.find(name)==type_num.end()){
+                //                     type_num.insert(std::make_pair(name,1));
+                //                 }else{
+                //                     for(int i = 0;i<type_num[name];i++){
+                //                         next_primitive=next_primitive->next_primitive;
+                //                     }
+                //                     type_num[name]++;
+                //                 }
+                //                 primitives_list[s]=next_primitive->pb_graph_node;
+                //                 cost += next_primitive->pb_graph_node->cluster_placement_primitive->base_cost + next_primitive->pb_graph_node->cluster_placement_primitive->incremental_cost;
+                //                 break;
+                //             }
+                //         }
+                //     }else{    
+                //         type_num.insert(std::make_pair(primitives_list[s]->pb_type->name,1));
+                //     }
+                // }
             }
             for (i = 0; i < list_size; i++) {
                 VTR_ASSERT((primitives_list[i] == nullptr) == (!molecule->atom_block_ids[i]));
@@ -566,6 +575,102 @@ static bool expand_forced_pack_molecule_placement(const t_pack_molecule* molecul
         cur = cur->next;
     }
 
+    return true;
+}
+
+void find_primitive_pb_node_rec(t_pb_graph_node* node , std::vector<t_pb_graph_node*> &children_leaf_pb_graph_node){
+    int i , j ,k;
+    t_pb_graph_node* child_node;
+    for(i=0;i<node->pb_type->num_modes;i++){
+        for(j=0;j<node->pb_type->modes[i].num_pb_type_children;j++){
+            for(k=0;k<node->pb_type->modes[i].pb_type_children[j].num_pb;k++){
+                child_node=&node->child_pb_graph_nodes[i][j][k];
+                if(child_node->is_primitive()){
+                    children_leaf_pb_graph_node.push_back(child_node);
+                }else{
+                    find_primitive_pb_node_rec(child_node,children_leaf_pb_graph_node);
+                }
+            }
+        }
+    }
+}
+
+static bool expand_ripple_molecule_placement(const t_pack_molecule* molecule,
+                                             const t_pb_graph_node* root_pb_graph_node,
+                                             t_pb_graph_node** primitives_list,
+                                             float* cost){
+    //
+    int i;
+    int first_lut,second_lut;//lut index in leaf_pb_graph_node_in_this_sub_top_node
+    int first_ff,second_ff;//ff index in leaf_pb_graph_node_in_this_sub_top_node
+    std::string block_model_name;
+    t_pb_graph_node *cur , *sub_cur ,*second_lut_pb_node, *ff_pb_node;
+    std::vector<t_pb_graph_node*> leaf_pb_graph_node_in_this_sub_top_node;
+    cur = root_pb_graph_node->parent_pb_graph_node;
+    //parent=cur->parent_pb_graph_node;
+    while(1){
+        if(cur->parent_pb_graph_node==nullptr){
+            break;
+        }
+        sub_cur=cur;
+        cur=cur->parent_pb_graph_node;
+    }
+    
+
+
+    find_primitive_pb_node_rec(sub_cur,leaf_pb_graph_node_in_this_sub_top_node);
+/*assum:
+    root must be lut
+    the order of blk_id in molecule must be  lut1----------ff1
+                                    lut2----------ff2
+                
+    lut ff must be lut1 ff1 or lut2 ff2
+    lut1 ff2 or lut2 ff1 is inpossible 
+    (according to the rule of rippleFPGA)*/
+
+    //VTR_ASSERT(molecule->root==0 && root_pb_graph_node->pb_type->name=="lut");
+    if(root_pb_graph_node==leaf_pb_graph_node_in_this_sub_top_node[0]) {
+        first_lut=0;
+        second_lut=2;
+    }else{
+        first_lut=2;
+        second_lut=0;
+    }
+    auto& atom_ctx = g_vpr_ctx.atom();
+    for( i=1 ; i < molecule->num_blocks ; i++){
+        block_model_name=atom_ctx.nlist.block_model(molecule->atom_block_ids[i])->name;
+        if(block_model_name ==".names"){
+            second_lut_pb_node=leaf_pb_graph_node_in_this_sub_top_node[second_lut];
+            if(primitive_type_feasible(molecule->atom_block_ids[i],second_lut_pb_node->pb_type)
+                && second_lut_pb_node->cluster_placement_primitive->valid==true){
+                primitives_list[i]=second_lut_pb_node;
+                *cost+=second_lut_pb_node->cluster_placement_primitive->base_cost+second_lut_pb_node->cluster_placement_primitive->incremental_cost;
+            }else{
+                return false;
+            }
+        }
+        if(block_model_name =="ff"){
+            if(atom_ctx.nlist.block_model(molecule->atom_block_ids[i-1])->name =="lut"){
+                if(root_pb_graph_node==leaf_pb_graph_node_in_this_sub_top_node[i-1]){
+                    //this ff belongs to root lut
+                    ff_pb_node=leaf_pb_graph_node_in_this_sub_top_node[first_lut+1];
+                }else{
+                    //this ff belongs to second lut
+                    ff_pb_node=leaf_pb_graph_node_in_this_sub_top_node[second_lut+1];
+                }
+            }else{
+                //belongs to root lut but place it to another ff position
+                ff_pb_node=leaf_pb_graph_node_in_this_sub_top_node[second_lut+1];
+            }
+            if(primitive_type_feasible(molecule->atom_block_ids[i],ff_pb_node->pb_type)
+                && ff_pb_node->cluster_placement_primitive->valid==true){
+                primitives_list[i]=ff_pb_node;
+                *cost+=ff_pb_node->cluster_placement_primitive->base_cost+ff_pb_node->cluster_placement_primitive->incremental_cost;
+            }else{
+                return false;
+            }
+        }
+    }
     return true;
 }
 
@@ -669,7 +774,7 @@ static t_pb_graph_pin* expand_pack_molecule_pin_edge(const int pattern_id,
     return dest_pin;
 }
 
-static void flush_intermediate_queues(t_cluster_placement_stats* cluster_placement_stats) {
+void flush_intermediate_queues(t_cluster_placement_stats* cluster_placement_stats) {
     t_cluster_placement_primitive *cur, *next;
     cur = cluster_placement_stats->tried;
     while (cur != nullptr) {

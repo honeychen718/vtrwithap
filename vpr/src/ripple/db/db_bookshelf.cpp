@@ -616,9 +616,10 @@ bool Database::readArch(t_vpr_setup& vpr_setup, t_arch& arch) {
             gpSetting.ramArea = tile.height * tile.width;
         }
         //
-
+        assert(tile.sub_tiles.size()<=1);
         for (auto const& sub_tile : tile.sub_tiles) {
             int const sub_tile_capacity = sub_tile.capacity.total();
+            database.subtile_capacity[sitetype]=sub_tile_capacity;
             for (auto const& pb_type : sub_tile.equivalent_sites) {
                 //cout<<equivalent_site->name<<endl;
                 t_model* cur_model = vpr_setup.user_models;

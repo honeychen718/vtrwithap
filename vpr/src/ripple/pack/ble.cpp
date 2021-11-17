@@ -45,6 +45,7 @@ BLE& BLE::operator=(const BLE& rhs) {
 void BLE::AddLUT(Instance* const inst) {
     assert(inst->IsLUT() && LUTs.size() < 2);
     LUTs.push_back(inst);
+    insts.push_back(inst);
 }
 
 void BLE::AddFF(Instance* const inst) {
@@ -59,6 +60,7 @@ void BLE::AddFF(Instance* const inst) {
     type.ce.push_back(inst->pins[database.cePinIdx]->net);
     // FF, nets
     FFs.push_back(inst);
+    insts.push_back(inst);
 }
 
 bool BLE::IsLUTCompatWith(BLE* rhs) {
@@ -93,8 +95,10 @@ void BLE::Print() const {
 }
 
 void BLE::GetResult(Group& group) const {
-    for (auto inst : FFs) group.instances.push_back(inst);
-    for (auto inst : LUTs) group.instances.push_back(inst);
+    // for (auto inst : FFs) group.instances.push_back(inst);
+    // for (auto inst : LUTs) group.instances.push_back(inst);
+    assert(LUTs.size()+FFs.size()==insts.size());
+    for (auto inst : insts) group.instances.push_back(inst);
 }
 
 void BLE::StatBles(const vector<BLE*>& bles) {

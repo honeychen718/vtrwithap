@@ -5,8 +5,99 @@
 #include "gp_setting.h"
 #include "SetupGrid.h"
 #include "vtr_math.h"
+#include "vpr_clb.h"
 
 const t_ext_pin_util FULL_EXTERNAL_PIN_UTIL(1., 1.);
+
+void read_cluster_placement_stats_from_clb( int type_index,
+                                            VPR_CLB *clb,
+                                            //map<int,map<t_pb_type*,map<t_pb_graph_node*,ripple_primitive_stats>>> &ripple_cluster_placement_stats,
+                                            t_cluster_placement_stats* cluster_placement_stats_ptr){
+    int t , m;
+    t_cluster_placement_primitive *cur , *prev;
+    ripple_primitive_stats ripple_primitive_stats;
+    //t_cluster_placement_stats* cluster_placement_stats_ptr;
+    for (size_t i = 0; i < clb->block_types.size(); i++) {
+        //auto &type=clb->block_types[i];
+        //cluster_placement_stats_ptr=&cluster_placement_stats[type_index];
+        reset_cluster_placement_stats(cluster_placement_stats_ptr);
+        if(clb->type_index_to_cluster_placement_stats.find(type_index)==clb->type_index_to_cluster_placement_stats.end()){
+            //initiate type_index_to_cluster_placement_stats[type->index] in clb
+            for (t = 0; t < cluster_placement_stats_ptr->num_pb_types; t++) {
+                if (cluster_placement_stats_ptr->valid_primitives[t]->next_primitive == nullptr) {
+                    continue;
+                }
+                cur = cluster_placement_stats_ptr->valid_primitives[t]->next_primitive;
+                while(cur){
+                    ripple_primitive_stats.base_cost=cur->base_cost;
+                    ripple_primitive_stats.incremental_cost=cur->incremental_cost;
+                    ripple_primitive_stats.valid=cur->valid;
+                    clb->type_index_to_cluster_placement_stats[type_index][cur->pb_graph_node->pb_type][cur->pb_graph_node]=ripple_primitive_stats;
+                    cur = cur->next_primitive;
+                }
+            }
+        }else{
+            //write type_index_to_cluster_placement_stats[type->index] to cluster_placement_stats
+            for (t = 0; t < cluster_placement_stats_ptr->num_pb_types; t++) {
+                if (cluster_placement_stats_ptr->valid_primitives[t]->next_primitive == nullptr) {
+                    continue;
+                }
+                prev = cluster_placement_stats_ptr->valid_primitives[t];
+                cur = cluster_placement_stats_ptr->valid_primitives[t]->next_primitive;
+                while(cur){
+                    ripple_primitive_stats=clb->type_index_to_cluster_placement_stats[type_index][cur->pb_graph_node->pb_type][cur->pb_graph_node];
+                    cur->base_cost=ripple_primitive_stats.base_cost;
+                    cur->incremental_cost=ripple_primitive_stats.incremental_cost;
+                    cur->valid=ripple_primitive_stats.valid;
+                    if(cur->valid == false){
+                        cur->valid = 0;
+                        prev->next_primitive = cur->next_primitive;
+                        cur->next_primitive = cluster_placement_stats_ptr->invalid;
+                        cluster_placement_stats_ptr->invalid = cur;
+                        cur = prev->next_primitive;
+                    }else{
+                        prev = cur;
+                        cur = cur->next_primitive;
+                    }
+                }
+            }
+        }
+    }
+}
+
+void write_cluster_placement_stats_to_clb(map<int,map<t_pb_type*,map<t_pb_graph_node*,ripple_primitive_stats>>> &ripple_cluster_placement_stats,
+                                            t_cluster_placement_stats* cluster_placement_stats){
+    //
+    int i;
+    t_cluster_placement_stats* cluster_placement_stats_ptr;
+    t_cluster_placement_primitive *cur;
+
+    for(auto &pair:ripple_cluster_placement_stats){
+        cluster_placement_stats_ptr=&cluster_placement_stats[pair.first];
+        flush_intermediate_queues(cluster_placement_stats_ptr);
+        //VTR_ASSERT(!cluster_placement_stats_ptr->tried && !cluster_placement_stats_ptr->in_flight);
+        cur=cluster_placement_stats_ptr->invalid;
+        while(cur){
+            auto &ripple_primitive=pair.second[cur->pb_graph_node->pb_type][cur->pb_graph_node];
+            ripple_primitive.base_cost=cur->base_cost;
+            ripple_primitive.incremental_cost=cur->incremental_cost;
+            //VTR_ASSERT(!cur->valid);
+            ripple_primitive.valid=cur->valid;
+            cur=cur->next_primitive;
+        }
+        for (i = 0; i < cluster_placement_stats_ptr->num_pb_types; i++) {
+            cur=cluster_placement_stats_ptr->valid_primitives[i]->next_primitive;
+            while(cur){
+                auto &ripple_primitive=pair.second[cur->pb_graph_node->pb_type][cur->pb_graph_node];
+                ripple_primitive.base_cost=cur->base_cost;
+                ripple_primitive.incremental_cost=cur->incremental_cost;
+                //VTR_ASSERT(cur->valid);
+                ripple_primitive.valid=cur->valid;
+                cur=cur->next_primitive;
+            }
+        }
+    }
+}
 
 bool vpr_start_new_cluster( VPR_CLB* &clb,t_pack_molecule* molecule,t_packer_opts& packer_opts,
                             std::vector<t_lb_type_rr_node>* &lb_type_rr_graphs,
@@ -16,7 +107,8 @@ bool vpr_start_new_cluster( VPR_CLB* &clb,t_pack_molecule* molecule,t_packer_opt
                             std::map<t_logical_block_type_ptr, size_t>& num_used_type_instances,
                             const std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types,
                             PartitionRegion& temp_cluster_pr,
-                            bool balance_block_type_utilization){
+                            bool balance_block_type_utilization,
+                            t_cluster_placement_stats* cluster_placement_stats){
     
 
     auto& atom_ctx = g_vpr_ctx.atom();
@@ -63,8 +155,14 @@ bool vpr_start_new_cluster( VPR_CLB* &clb,t_pack_molecule* molecule,t_packer_opt
     //t_pb* &pb = pb;
 
     //PartitionRegion temp_cluster_pr;
-
+    
     bool success=false;
+    
+    t_cluster_placement_stats* cluster_placement_stats_ptr;
+    
+    //ripple_primitives_stats ripple_cur;
+    // cluster_placement_stats_for_ripple ripple_placement_stats;
+    // placement_primitives_for_ripple ripple_placement_primitives;
     for (size_t i = 0; i < clb->block_types.size(); i++) {
         auto type =clb->block_types[i];
         t_pb* pb = new t_pb;
@@ -72,22 +170,24 @@ bool vpr_start_new_cluster( VPR_CLB* &clb,t_pack_molecule* molecule,t_packer_opt
         alloc_and_load_pb_stats(pb, packer_opts.feasible_block_array_size);
         pb->parent_pb = nullptr;
         router_data=alloc_and_load_router_data(&lb_type_rr_graphs[type->index], type);
-
+        cluster_placement_stats_ptr=&cluster_placement_stats[type->index];
         e_block_pack_status pack_result = BLK_STATUS_UNDEFINED;
+        read_cluster_placement_stats_from_clb(type->index,clb,cluster_placement_stats_ptr);
         for (int j = 0; j < type->pb_graph_head->pb_type->num_modes && !success; j++) {
             pb->mode = j;
-            /**********************************
-            if(clb->type_index_to_cluster_placement_stats.find(type->index)==clb->type_index_to_cluster_placement_stats.end()){
-                clb->type_index_to_cluster_placement_stats[type->index]= new t_cluster_placement_stats;
-                *(clb->type_index_to_cluster_placement_stats[type->index])=cluster_placement_stats[type->index];
-            }
-            //**********************************/
+            //**********************************
+            // if(clb->type_index_to_cluster_placement_stats.find(type->index)==clb->type_index_to_cluster_placement_stats.end()){
+            //     clb->type_index_to_cluster_placement_stats[type->index]= new t_cluster_placement_stats;
+            //     *(clb->type_index_to_cluster_placement_stats[type->index])=cluster_placement_stats[type->index];
+            // }
+            
             //reset_cluster_placement_stats(clb->type_index_to_cluster_placement_stats[type->index]);
-            clb->cluster_placement_stats=alloc_and_load_cluster_placement_stats();
+            //clb->cluster_placement_stats=alloc_and_load_cluster_placement_stats();
 
             set_mode_cluster_placement_stats(pb->pb_graph_node, j);
 
-            pack_result = try_pack_molecule(&clb->cluster_placement_stats[type->index],
+            //*********************************************************
+            pack_result = try_pack_molecule(cluster_placement_stats_ptr,
                                 atom_molecules,
                                 molecule, primitives_list, pb,
                                 gpSetting.num_models, max_cluster_size, clb_index,
@@ -107,6 +207,11 @@ bool vpr_start_new_cluster( VPR_CLB* &clb,t_pack_molecule* molecule,t_packer_opt
             }
             pb->name = vtr::strdup(root_atom_name.c_str());
             clb_index =clb_nlist->create_block(root_atom_name.c_str(), pb, type);
+            for(auto &pair:clb->type_index_to_cluster_placement_stats){
+                if(pair.first != type->index){
+                    clb->type_index_to_cluster_placement_stats.erase(pair.first);
+                }
+            }
             break;
         } else {
         //Free failed clustering and try again
@@ -184,16 +289,22 @@ bool Legalizer::MergeMoleculeToSite(Site* site, t_pack_molecule* molecule,
                                  t_pb_graph_node** primitives_list,
                                  int max_cluster_size,ClusteredNetlist* clb_nlist,
                                  std::map<t_logical_block_type_ptr, size_t>& num_used_type_instances,
-                                 const std::unordered_set<AtomNetId>& is_clock,const t_pack_high_fanout_thresholds& high_fanout_thresholds,
+                                 const std::unordered_set<AtomNetId>& is_clock,
+                                 //const t_pack_high_fanout_thresholds& high_fanout_thresholds,
                                  std::shared_ptr<SetupTimingInfo>& timing_info,const t_ext_pin_util_targets& ext_pin_util_targets,
                                  //vtr::vector<ClusterBlockId, std::vector<t_intra_lb_net>*>& intra_lb_routing,
                                  vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
                                  t_logical_block_type_ptr& logic_block_type,t_pb_type* le_pb_type,
                                  std::vector<int>& le_count,int& num_clb,
                                  const std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types,
-                                 bool balance_block_type_utilization) {
+                                 bool balance_block_type_utilization,
+                                 t_cluster_placement_stats* cluster_placement_stats) {
     if (site->pack == NULL) {
         database.place(database.addPack(site->type), site->x, site->y);
+    }
+    AtomBlockId target_blk_id = AtomBlockId(475);
+    if(molecule->atom_block_ids[0]==target_blk_id){
+        cout<<"find"<<endl;
     }
 //****************************
     // t_cluster_placement_stats *cluster_placement_stats;
@@ -232,14 +343,14 @@ bool Legalizer::MergeMoleculeToSite(Site* site, t_pack_molecule* molecule,
     auto& cluster_ctx = g_vpr_ctx.mutable_clustering();
     VPR_CLB* &clb = lgData.clbMap[site->x][site->y];
     ClusterBlockId clb_index;
-    t_lb_router_data* &router_data = clb->router_data;
     if(!clb->valid){
         clb_index=(ClusterBlockId)num_clb;
         success=vpr_start_new_cluster(  clb,molecule,packer_opts,lb_type_rr_graphs,
                                         atom_molecules,
                                         primitives_list,max_cluster_size,clb_index,clb_nlist,
-                                        router_data,num_used_type_instances,primitive_candidate_block_types,
-                                        clb->temp_cluster_pr,balance_block_type_utilization);
+                                        clb->router_data,num_used_type_instances,primitive_candidate_block_types,
+                                        clb->temp_cluster_pr,balance_block_type_utilization,
+                                        cluster_placement_stats);
         if(success){
             //router_data=nullptr;
             clb->valid=true;
@@ -247,9 +358,12 @@ bool Legalizer::MergeMoleculeToSite(Site* site, t_pack_molecule* molecule,
             num_clb++;
         }
     }else{
+        int type_index;
         clb_index=clb->index;
-        cur_cluster_placement_stats_ptr = &clb->cluster_placement_stats[cluster_ctx.clb_nlist.block_type(clb_index)->index];
+        type_index=cluster_ctx.clb_nlist.block_type(clb_index)->index;
+        cur_cluster_placement_stats_ptr = &cluster_placement_stats[type_index];
         target_ext_pin_util = ext_pin_util_targets.get_pin_util(cluster_ctx.clb_nlist.block_type(clb_index)->name);
+        read_cluster_placement_stats_from_clb(type_index,clb,cur_cluster_placement_stats_ptr);
         block_pack_status = try_pack_molecule(cur_cluster_placement_stats_ptr,
                                         atom_molecules,
                                         molecule,
@@ -267,15 +381,10 @@ bool Legalizer::MergeMoleculeToSite(Site* site, t_pack_molecule* molecule,
                                         clb->temp_cluster_pr);
         success = block_pack_status == BLK_PASSED;
     }
-    int high_fanout_threshold =  high_fanout_thresholds.get_threshold(cluster_ctx.clb_nlist.block_type(clb->index)->name);
-    update_cluster_stats(molecule, clb_index,
-                            is_clock, //Set of clock nets
-                            is_clock, //Set of global nets (currently all clocks)
-                            packer_opts.global_clocks,
-                            packer_opts.alpha, packer_opts.beta,
-                            packer_opts.timing_driven, packer_opts.connection_driven,
-                            high_fanout_threshold,
-                            *timing_info);
+    if(success){
+        write_cluster_placement_stats_to_clb(clb->type_index_to_cluster_placement_stats,cluster_placement_stats);
+    }
+
 
     
     //if(high_fanout_thresholds != NULL) cout<<1<<endl;
@@ -292,12 +401,9 @@ bool Legalizer::MergeMoleculeToSite(Site* site, t_pack_molecule* molecule,
         lgData.invokeCount++;
         if (success) {
             lgData.successCount++;
-            return true;
-        }else{
-            abort(); //check clb only , delete finally
         }
     }
-    return false;
+    return success;
 }
 
 bool Legalizer::AssignPackToSite(Site* site, Group& group) {
@@ -543,7 +649,8 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
                         t_logical_block_type_ptr& logic_block_type,t_pb_type* le_pb_type,
                         std::vector<int>& le_count,int& num_clb,
                         const std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types,
-                        bool balance_block_type_utilization) {
+                        bool balance_block_type_utilization,
+                        t_cluster_placement_stats* cluster_placement_stats) {
     const int MAX_WIN = 1000;
 
     // SortGroupsByPins();
@@ -564,7 +671,7 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
     //         }
     //     }
     // }
-
+    auto& cluster_ctx = g_vpr_ctx.mutable_clustering();
     for (const auto gid : lgData.groupIds) {
         // cout<<gid<<endl;
         // if(gid==475){
@@ -623,20 +730,32 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
             for (unsigned s = 0; !isPlaced && s < candSites.size(); s++) {
                 curSite = candSites[s];
                 isPlaced=true;
-                for(int i=0;i<group.instances.size();i++){
-                    if(!MergeMoleculeToSite(curSite, group.instances[i]->vpr_molecule, false,packer_opts,
-                                    lb_type_rr_graphs,atom_molecules,
-                                    primitives_list,max_cluster_size,clb_nlist,num_used_type_instances,
-                                    is_clock,high_fanout_thresholds,timing_info,ext_pin_util_targets,
-                                    //intra_lb_routing,
-                                    clb_inter_blk_nets,logic_block_type,
-                                    le_pb_type,le_count,num_clb,primitive_candidate_block_types,
-                                    balance_block_type_utilization)){
-                                        isPlaced=false;
-                                    }
+                
+                if(!MergeMoleculeToSite(curSite, group.vpr_molecule, false,packer_opts,
+                                lb_type_rr_graphs,atom_molecules,
+                                primitives_list,max_cluster_size,clb_nlist,num_used_type_instances,
+                                is_clock,timing_info,ext_pin_util_targets,
+                                //intra_lb_routing,
+                                clb_inter_blk_nets,logic_block_type,
+                                le_pb_type,le_count,num_clb,primitive_candidate_block_types,
+                                balance_block_type_utilization,cluster_placement_stats)){
+                    isPlaced=false;
                 }
-                if (isPlaced) {
-                    isPlaced = true;
+                
+                if(isPlaced){
+                    //place succeed!!!
+                    auto clb_index=lgData.clbMap[curSite->x][curSite->y]->index;
+                    int high_fanout_threshold =  high_fanout_thresholds.get_threshold(cluster_ctx.clb_nlist.block_type(clb_index)->name);
+                    
+                    update_cluster_stats(group.vpr_molecule, clb_index,
+                        is_clock, //Set of clock nets
+                        is_clock, //Set of global nets (currently all clocks)
+                        packer_opts.global_clocks,
+                        packer_opts.alpha, packer_opts.beta,
+                        packer_opts.timing_driven, packer_opts.connection_driven,
+                        high_fanout_threshold,
+                        *timing_info);
+                
                     lgData.PartialUpdate(group, curSite);
 
                     double disp = abs((int)group.x - (int)lgData.groupsX[group.id]) +
@@ -672,7 +791,6 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
      *****************************************************************/
     bool is_cluster_legal;
     auto& atom_ctx = g_vpr_ctx.atom();
-    auto& cluster_ctx = g_vpr_ctx.mutable_clustering();
     for(int x=0;x<database.sitemap_nx;x++){
         for(int y=0;y<database.sitemap_ny;y++){
             VPR_CLB* clb=lgData.clbMap[x][y];
@@ -727,7 +845,7 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
             }
             //free_router_data(router_data);
             //router_data = nullptr;//? necessary?
-            free_cluster_placement_stats(clb->cluster_placement_stats);
+            free_cluster_placement_stats(cluster_placement_stats);
         }
     }
 

@@ -1377,10 +1377,10 @@ enum e_block_pack_status try_pack_molecule(t_cluster_placement_stats* cluster_pl
         VTR_LOG("\t\tTry pack molecule: '%s' (%s)",
                 atom_ctx.nlist.block_name(root_atom).c_str(),
                 atom_ctx.nlist.block_model(root_atom)->name);
-        VTR_LOGV(molecule->pack_pattern,
-                 " molecule_type %s molecule_size %zu",
-                 molecule->pack_pattern->name,
-                 molecule->atom_block_ids.size());
+        // VTR_LOGV(molecule->pack_pattern,
+        //          " molecule_type %s molecule_size %zu",
+        //          molecule->pack_pattern->name,
+        //          molecule->atom_block_ids.size());
         VTR_LOG("\n");
     }
 

@@ -27,6 +27,7 @@ private:
 
     vector<Instance*> LUTs;  // max size 2
     vector<Instance*> FFs;   // max size 2
+    vector<Instance*> insts;   // max size 4 ,add by jia
     BleType type;
 
     BLE& operator=(const BLE& rhs);

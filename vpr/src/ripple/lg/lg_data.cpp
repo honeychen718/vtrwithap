@@ -229,17 +229,22 @@ void LGData::Init(lgPackMethod packMethod) {
     clbMap.assign(database.sitemap_nx, vector<VPR_CLB*>(database.sitemap_ny, NULL));
 
     // assign clb to slice
+    SiteType *st;
     for (int x = 0; x < database.sitemap_nx; x++) {
         for (int y = 0; y < database.sitemap_ny; y++) {
-            if (database.getSite(x, y)->type->name == SiteType::SLICE) {
+            st=database.getSite(x, y)->type;
+            if (st->name != SiteType::EMPTY) {
                 if (packMethod == USE_VPR_CLB)
-                    clbMap[x][y] = new VPR_CLB;
+                    clbMap[x][y] = new VPR_CLB[database.subtile_capacity[st]];
                     //clbMap[x][y]->type=g_vpr_ctx.mutable_device().grid[x][y].type;
                 else
                     printlog(LOG_ERROR, "wrong pack method");
             }
         }
     }
+    //abort();
+    // cout<<sizeof(*clbMap[0][1])<<endl;
+    // cout<<sizeof(*clbMap[1][1])<<endl;
 }
 
 LGData::LGData(vector<Group>& _groups) : groups(_groups) {}
@@ -327,7 +332,7 @@ void LGData::GetResult(lgRetrunGroup retGroup) {
     // clean up
     for (int x = 0; x < database.sitemap_nx; x++) {
         for (int y = 0; y < database.sitemap_ny; y++) {
-            delete clbMap[x][y];
+            delete[] clbMap[x][y];
         }
     }
 }

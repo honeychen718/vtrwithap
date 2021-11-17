@@ -29,4 +29,7 @@ bool exists_free_primitive_for_atom_block(
 void reset_tried_but_unused_cluster_placements(
     t_cluster_placement_stats* cluster_placement_stats);
 
+
+void flush_intermediate_queues(t_cluster_placement_stats* cluster_placement_stats);
+
 #endif

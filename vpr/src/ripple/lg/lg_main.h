@@ -26,14 +26,16 @@ private:
                             t_pb_graph_node** primitives_list,
                             int max_cluster_size,ClusteredNetlist* clb_nlist,
                             std::map<t_logical_block_type_ptr, size_t>& num_used_type_instances,
-                            const std::unordered_set<AtomNetId>& is_clock,const t_pack_high_fanout_thresholds& high_fanout_thresholds,
+                            const std::unordered_set<AtomNetId>& is_clock,
+                            //const t_pack_high_fanout_thresholds& high_fanout_thresholds,
                             std::shared_ptr<SetupTimingInfo>& timing_info,const t_ext_pin_util_targets& ext_pin_util_targets,
                             //vtr::vector<ClusterBlockId, std::vector<t_intra_lb_net>*>& intra_lb_routing,
                             vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
                             t_logical_block_type_ptr& logic_block_type,t_pb_type* le_pb_type,
                             std::vector<int>& le_count,int& num_clb,
                             const std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types,
-                            bool balance_block_type_utilization);
+                            bool balance_block_type_utilization,
+                            t_cluster_placement_stats* cluster_placement_stats);
     bool AssignPackToSite(Site *site, Group &group);
 
     void SortCandSitesByHpwl(vector<Site *> &candSites, const Group &group);
@@ -69,7 +71,8 @@ public:
                 t_logical_block_type_ptr& logic_block_type,t_pb_type* le_pb_type,
                 std::vector<int>& le_count,int& num_clb,
                 const std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types,
-                bool balance_block_type_utilization);
+                bool balance_block_type_utilization,
+                t_cluster_placement_stats* cluster_placement_stats);
     void RunPartial();
 
     double GetHpwl();

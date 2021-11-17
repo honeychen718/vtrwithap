@@ -41,6 +41,7 @@ public:
     vector<Instance*> instances;
 
     // site
+    map<SiteType* , int> subtile_capacity;
     vector<Resource*> resources;
     vector<SiteType*> sitetypes;
     vector<Pack*> packs;

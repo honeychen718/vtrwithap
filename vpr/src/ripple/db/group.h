@@ -16,6 +16,7 @@ public:
     double lastX, lastY;
     double areaScale;
     Box<int> lgBox;
+    t_pack_molecule* vpr_molecule;
 
     Group()
         : id(-1), x(0.0), y(0.0), lastX(0.0), lastY(0.0), areaScale(1.0), lgBox(INT_MAX, INT_MAX, INT_MIN, INT_MIN) {}
