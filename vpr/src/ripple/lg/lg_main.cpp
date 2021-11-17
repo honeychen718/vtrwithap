@@ -183,7 +183,7 @@ bool vpr_start_new_cluster( VPR_CLB* &clb,t_pack_molecule* molecule,t_packer_opt
             
             //reset_cluster_placement_stats(clb->type_index_to_cluster_placement_stats[type->index]);
             //clb->cluster_placement_stats=alloc_and_load_cluster_placement_stats();
-
+            reset_cluster_placement_stats(cluster_placement_stats_ptr);
             set_mode_cluster_placement_stats(pb->pb_graph_node, j);
 
             //*********************************************************
@@ -302,9 +302,12 @@ bool Legalizer::MergeMoleculeToSite(Site* site, t_pack_molecule* molecule,
     if (site->pack == NULL) {
         database.place(database.addPack(site->type), site->x, site->y);
     }
-    AtomBlockId target_blk_id = AtomBlockId(475);
+    if(site==database.getSite(14,0)){
+        cout<<"find site"<<endl;
+    }
+    AtomBlockId target_blk_id = AtomBlockId(162);
     if(molecule->atom_block_ids[0]==target_blk_id){
-        cout<<"find"<<endl;
+        cout<<"find blk"<<endl;
     }
 //****************************
     // t_cluster_placement_stats *cluster_placement_stats;
@@ -341,7 +344,23 @@ bool Legalizer::MergeMoleculeToSite(Site* site, t_pack_molecule* molecule,
     //PartitionRegion temp_cluster_pr;
     auto& atom_ctx = g_vpr_ctx.atom();
     auto& cluster_ctx = g_vpr_ctx.mutable_clustering();
-    VPR_CLB* &clb = lgData.clbMap[site->x][site->y];
+    VPR_CLB* clb=nullptr;
+    if(site->type->name == SiteType::IO){
+        for(int i = 0;i<database.subtile_capacity[site->type];i++){
+            if(!lgData.clbMap[site->x][site->y][i].is_full){
+                clb = &lgData.clbMap[site->x][site->y][i];
+                site->cur_cluster=i;
+                break;
+            }
+        }
+        if(clb==nullptr){
+            return false;
+        }
+    }else{
+        clb = lgData.clbMap[site->x][site->y];
+        site->cur_cluster=0;
+    }
+    
     ClusterBlockId clb_index;
     if(!clb->valid){
         clb_index=(ClusterBlockId)num_clb;
@@ -401,6 +420,11 @@ bool Legalizer::MergeMoleculeToSite(Site* site, t_pack_molecule* molecule,
         lgData.invokeCount++;
         if (success) {
             lgData.successCount++;
+        }
+    }
+    if(type == SiteType::IO){
+        if(success){
+            clb->is_full=true;
         }
     }
     return success;
@@ -744,7 +768,7 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
                 
                 if(isPlaced){
                     //place succeed!!!
-                    auto clb_index=lgData.clbMap[curSite->x][curSite->y]->index;
+                    auto clb_index=lgData.clbMap[curSite->x][curSite->y][curSite->cur_cluster].index;
                     int high_fanout_threshold =  high_fanout_thresholds.get_threshold(cluster_ctx.clb_nlist.block_type(clb_index)->name);
                     
                     update_cluster_stats(group.vpr_molecule, clb_index,
@@ -793,62 +817,63 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
     auto& atom_ctx = g_vpr_ctx.atom();
     for(int x=0;x<database.sitemap_nx;x++){
         for(int y=0;y<database.sitemap_ny;y++){
-            VPR_CLB* clb=lgData.clbMap[x][y];
-            if(clb!=nullptr && clb->valid){
-                t_mode_selection_status mode_status;
-                is_cluster_legal = try_intra_lb_route(clb->router_data, packer_opts.pack_verbosity, &mode_status);
-                if (is_cluster_legal) { 
-                    intra_lb_routing.push_back(clb->router_data->saved_lb_nets);
-                    //VTR_ASSERT((int)intra_lb_routing.size() == num_clb);
-                    if((int)intra_lb_routing.size() != num_clb){
-                        printlog(LOG_ERROR, "intra_lb_routing.size() != num_clb");
-                    }
-                    clb->router_data->saved_lb_nets = nullptr;
+            for(int i=0;i< database.subtile_capacity[database.getSite(x,y)->type] ; i++){
+                VPR_CLB* clb=&lgData.clbMap[x][y][i];
+                if(clb!=nullptr && clb->valid){
+                    t_mode_selection_status mode_status;
+                    is_cluster_legal = try_intra_lb_route(clb->router_data, packer_opts.pack_verbosity, &mode_status);
+                    if (is_cluster_legal) { 
+                        intra_lb_routing.push_back(clb->router_data->saved_lb_nets);
+                        //VTR_ASSERT((int)intra_lb_routing.size() == num_clb);
+                        // if((int)intra_lb_routing.size() != num_clb){
+                        //     printlog(LOG_ERROR, "intra_lb_routing.size() != num_clb");
+                        // }
+                        clb->router_data->saved_lb_nets = nullptr;
 
-                    //Pick a new seed
-                    //istart = get_highest_gain_seed_molecule(&seedindex, atom_molecules, seed_atoms);
+                        //Pick a new seed
+                        //istart = get_highest_gain_seed_molecule(&seedindex, atom_molecules, seed_atoms);
 
-                    // if (packer_opts.timing_driven) {
-                    //     if (num_blocks_hill_added > 0) {
-                    //         blocks_since_last_analysis += num_blocks_hill_added;
-                    //     }
-                    // }
+                        // if (packer_opts.timing_driven) {
+                        //     if (num_blocks_hill_added > 0) {
+                        //         blocks_since_last_analysis += num_blocks_hill_added;
+                        //     }
+                        // }
 
-                    /* store info that will be used later in packing from pb_stats and free the rest */
-                    t_pb_stats* pb_stats = cluster_ctx.clb_nlist.block_pb(clb->index)->pb_stats;
-                    for (const AtomNetId mnet_id : pb_stats->marked_nets) {
-                        int external_terminals = atom_ctx.nlist.net_pins(mnet_id).size() - pb_stats->num_pins_of_net_in_pb[mnet_id];
-                        /* Check if external terminals of net is within the fanout limit and that there exists external terminals */
-                        if (external_terminals < packer_opts.transitive_fanout_threshold && external_terminals > 0) {
-                            clb_inter_blk_nets[clb->index].push_back(mnet_id);
+                        /* store info that will be used later in packing from pb_stats and free the rest */
+                        t_pb_stats* pb_stats = cluster_ctx.clb_nlist.block_pb(clb->index)->pb_stats;
+                        for (const AtomNetId mnet_id : pb_stats->marked_nets) {
+                            int external_terminals = atom_ctx.nlist.net_pins(mnet_id).size() - pb_stats->num_pins_of_net_in_pb[mnet_id];
+                            /* Check if external terminals of net is within the fanout limit and that there exists external terminals */
+                            if (external_terminals < packer_opts.transitive_fanout_threshold && external_terminals > 0) {
+                                clb_inter_blk_nets[clb->index].push_back(mnet_id);
+                            }
                         }
+                        auto cur_pb = cluster_ctx.clb_nlist.block_pb(clb->index);
+
+                        // update the data structure holding the LE counts
+                        update_le_count(cur_pb, logic_block_type, le_pb_type, le_count);
+
+                        //print clustering progress incrementally
+                        //print_pack_status(num_clb, num_molecules, num_molecules_processed, mols_since_last_print, device_ctx.grid.width(), device_ctx.grid.height());
+
+                        free_pb_stats_recursive(cur_pb);
+                    } else {
+                        /* Free up data structures and requeue used molecules */
+                        num_used_type_instances[cluster_ctx.clb_nlist.block_type(clb->index)]--;
+                        revalid_molecules(cluster_ctx.clb_nlist.block_pb(clb->index), atom_molecules);
+                        cluster_ctx.clb_nlist.remove_block(clb->index);
+                        cluster_ctx.clb_nlist.compress();
+                        num_clb--;
+                        //seedindex = savedseedindex;
+                        abort();
                     }
-                    auto cur_pb = cluster_ctx.clb_nlist.block_pb(clb->index);
-
-                    // update the data structure holding the LE counts
-                    update_le_count(cur_pb, logic_block_type, le_pb_type, le_count);
-
-                    //print clustering progress incrementally
-                    //print_pack_status(num_clb, num_molecules, num_molecules_processed, mols_since_last_print, device_ctx.grid.width(), device_ctx.grid.height());
-
-                    free_pb_stats_recursive(cur_pb);
-                } else {
-                    /* Free up data structures and requeue used molecules */
-                    num_used_type_instances[cluster_ctx.clb_nlist.block_type(clb->index)]--;
-                    revalid_molecules(cluster_ctx.clb_nlist.block_pb(clb->index), atom_molecules);
-                    cluster_ctx.clb_nlist.remove_block(clb->index);
-                    cluster_ctx.clb_nlist.compress();
-                    num_clb--;
-                    //seedindex = savedseedindex;
-                    abort();
                 }
+                //free_router_data(router_data);
+                //router_data = nullptr;//? necessary?
             }
-            //free_router_data(router_data);
-            //router_data = nullptr;//? necessary?
-            free_cluster_placement_stats(cluster_placement_stats);
         }
     }
-
+    //free_cluster_placement_stats(cluster_placement_stats);
 
 
 

@@ -51,6 +51,7 @@ public:
     Pack *pack;
     int x, y;
     int w, h;
+    int cur_cluster;//for io
     Site();
     Site(int x, int y, SiteType *sitetype);
     //~Site();

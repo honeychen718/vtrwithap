@@ -294,7 +294,7 @@ void LGData::UpdateGroupXYnOrder() {
     for (auto group : groups) groupMap[group.x][group.y].push_back(group.id);
 }
 
-void LGData::GetResult(lgRetrunGroup retGroup) {
+void LGData::GetResult(lgRetrunGroup retGroup) {//todo: a lot!!!!!!!!!!
     // transform clb to pack
     SiteType* siteslice = database.getSiteType(SiteType::NameString2Enum("SLICE"));
     int numresourceinslice=siteslice->resources.size();
