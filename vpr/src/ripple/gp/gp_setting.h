@@ -32,10 +32,6 @@ public:
     bool packed;
     bool useLastXY;
 
-    unsigned ffPerSlice, lutPerSlice;
-
-    int num_models;
-
     void setDefault();
     void init();
     void set0();

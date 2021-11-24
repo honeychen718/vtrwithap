@@ -19,10 +19,10 @@ void LGData::GetDispStatics() {
 
         // scale to hpwl calc method
         if (group.GetSiteType() != SiteType::SLICE) {
-            disp = abs(targetSite->x - database.getSite(orgX, orgY)->x) * 0.5 +
+            disp = abs(targetSite->x - database.getSite(orgX, orgY)->x) +
                    abs(targetSite->y - database.getSite(orgX, orgY)->y);
         } else {
-            disp = abs(targetSite->x - orgX) * 0.5 + abs(targetSite->y - orgY);
+            disp = abs(targetSite->x - orgX)  + abs(targetSite->y - orgY);
         }
 
         dispPerSite[orgX][orgY] += disp;

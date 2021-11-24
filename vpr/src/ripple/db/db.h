@@ -21,6 +21,7 @@ private:
     // instance
     unordered_map<Master::Name, Master*, hash<int>> name_masters;
     unordered_map<string, Instance*> name_instances;
+    unordered_map<AtomBlockId,Instance*> atom_instances; 
 
     // site
     unordered_map<Resource::Name, Resource*, hash<int>> name_resources;
@@ -33,6 +34,31 @@ public:
     void setup();
     void print();
 
+    //vpr setup added by jia
+    t_vpr_setup* vpr_setup;
+
+    //vpr_pack added by jia 
+    int num_clb = 0;
+
+    //atom
+    std::multimap<AtomBlockId, t_pack_molecule*> atom_molecules;
+
+    //about pack
+    int max_cluster_size;
+    bool balance_block_type_util;
+    t_pb_graph_node** primitives_list;
+    std::unordered_set<AtomNetId> is_clock;
+    std::shared_ptr<SetupTimingInfo> timing_info;
+    t_ext_pin_util_targets target_external_pin_util;
+    t_cluster_placement_stats* cluster_placement_stats;
+    t_pack_high_fanout_thresholds high_fanout_thresholds;
+    std::map<t_logical_block_type_ptr, size_t> num_used_type_instances;
+    std::map<const t_model*, std::vector<t_logical_block_type_ptr>> primitive_candidate_block_types;
+
+    unsigned ffPerSlice, lutPerSlice;//added by jia
+
+    int num_models;//added by jia
+
     // net
     vector<Net*> nets;
 
@@ -41,7 +67,7 @@ public:
     vector<Instance*> instances;
 
     // site
-    map<SiteType* , int> subtile_capacity;
+    map<SiteType* , int> subtile_capacity; //added by jia
     vector<Resource*> resources;
     vector<SiteType*> sitetypes;
     vector<Pack*> packs;
@@ -122,6 +148,7 @@ public:
 
     Master* getMaster(Master::Name name);
     Instance* getInstance(const string& name);
+    Instance* getInstance(const AtomBlockId & atom);
     Net* getNet(const string& name);
     Resource* getResource(Resource::Name name);
     SiteType* getSiteType(SiteType::Name name);
@@ -137,7 +164,7 @@ public:
     bool readScl(string file);
     bool readLib(string file);
     bool writePl(string file);
-    bool readArch( t_vpr_setup& vpr_setup,t_arch& arch);
+    bool readArch(t_arch& arch);
 
     /***** Drawing (defined in db_draw.cpp *****/
     enum DrawType {

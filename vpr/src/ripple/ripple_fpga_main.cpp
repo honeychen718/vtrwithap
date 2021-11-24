@@ -14,7 +14,7 @@ Setting setting;
 //bool get_args(int argc, char** argv);
 
 //int main(int argc, char** argv) {
-bool ripple_fpga_main(t_vpr_setup& vpr_setup,t_arch& arch) {
+bool ripple_fpga_main(t_vpr_setup* vpr_setup_in,t_arch& arch) {
     // init_log(LOG_ALL);
     init_log(LOG_NORMAL);
 
@@ -29,7 +29,9 @@ bool ripple_fpga_main(t_vpr_setup& vpr_setup,t_arch& arch) {
     //database.readScl(setting.io_scl);
     //database.readPl(setting.io_pl);
     //database.readNets(setting.io_nets);
-    database.readArch(vpr_setup,arch);
+
+    database.vpr_setup=vpr_setup_in;
+    database.readArch(arch);
 
     database.setup();
     database.print();
@@ -52,7 +54,7 @@ bool ripple_fpga_main(t_vpr_setup& vpr_setup,t_arch& arch) {
     // reallocate
     gpSetting.set0();
     gplace(groups);
-    //ReallocByCluster(groups);
+    ReallocByCluster(groups);
 
     // pack bles
     gpSetting.set1();
@@ -74,15 +76,15 @@ bool ripple_fpga_main(t_vpr_setup& vpr_setup,t_arch& arch) {
     gplace(groups);
     if (database.crmap_nx == 0) {
         gpSetting.set2c();
-        gp_cong(groups, 3 ,vpr_setup);
+        gp_cong(groups, 3);
     }
     legalize_partial(groups);
     gpSetting.set3();
     gplace(groups);
 
     // legalize
-    planning(groups);
-    legalize_partial(groups);
+    // planning(groups);            ////////// delete by jia 
+    legalize_partial(groups);    ////////// delete by jia 
     if (database.crmap_nx == 0)
         legalize(groups, SITE_HPWL, UPDATE_XY_ORDER);
     else

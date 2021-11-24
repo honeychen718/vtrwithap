@@ -87,7 +87,7 @@ t_pack_molecule* TurnGroupsIntoMolecules(vector<Group>& groups,
     return list_of_molecules_head;
 }
 //******************************************down
-void gp_cong(vector<Group>& groups, int iteration ,t_vpr_setup& vpr_setup) {
+void gp_cong(vector<Group>& groups, int iteration ) {
     printlog(LOG_INFO, "");
     printlog(LOG_INFO, " = = = = begin congestion-driven GP = = = = ");
     printlog(LOG_INFO, "");
@@ -99,17 +99,16 @@ void gp_cong(vector<Group>& groups, int iteration ,t_vpr_setup& vpr_setup) {
 
 //before do_clustering
 //******************************************up
-    t_packer_opts &packer_opts = vpr_setup.PackerOpts;
-    const t_analysis_opts& analysis_opts = vpr_setup.AnalysisOpts;
-    std::vector<t_lb_type_rr_node>* lb_type_rr_graphs=vpr_setup.PackerRRGraph;
+    t_packer_opts &packer_opts = database.vpr_setup->PackerOpts;
+    const t_analysis_opts& analysis_opts = database.vpr_setup->AnalysisOpts;
+    std::vector<t_lb_type_rr_node>* lb_type_rr_graphs=database.vpr_setup->PackerRRGraph;
     std::unordered_set<AtomNetId> is_clock;
-    std::multimap<AtomBlockId, t_pack_molecule*> atom_molecules;
     std::unordered_map<AtomBlockId, t_pb_graph_node*> expected_lowest_cost_pb_gnode;
     std::unique_ptr<t_pack_molecule, decltype(&free_pack_molecules)> list_of_pack_molecules(nullptr, free_pack_molecules);
     is_clock = alloc_and_load_is_clock(packer_opts.global_clocks);
     
     list_of_pack_molecules.reset(TurnGroupsIntoMolecules(groups,
-                                                        atom_molecules,
+                                                        database.atom_molecules,
                                                         expected_lowest_cost_pb_gnode));
     t_ext_pin_util_targets target_external_pin_util = parse_target_external_pin_util(packer_opts.target_external_pin_util);
     t_pack_high_fanout_thresholds high_fanout_thresholds = parse_high_fanout_thresholds(packer_opts.high_fanout_threshold);
@@ -228,7 +227,7 @@ void gp_cong(vector<Group>& groups, int iteration ,t_vpr_setup& vpr_setup) {
 
 
 //******************************************down
-    legalizer->RunAll(  SITE_HPWL_SMALL_WIN, DEFAULT,packer_opts,lb_type_rr_graphs,atom_molecules,
+    legalizer->RunAll(  SITE_HPWL_SMALL_WIN, DEFAULT,packer_opts,lb_type_rr_graphs,database.atom_molecules,
                         primitives_list,max_cluster_size,&cluster_ctx.clb_nlist,
                         num_used_type_instances,is_clock,high_fanout_thresholds,timing_info,
                         target_external_pin_util,intra_lb_routing,clb_inter_blk_nets,logic_block_type,

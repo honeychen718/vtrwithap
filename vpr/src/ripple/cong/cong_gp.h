@@ -4,4 +4,4 @@
 
 void AdjAreaByCong(vector<db::Group> &groups);
 
-void gp_cong(vector<db::Group> &groups, int iteration ,t_vpr_setup& vpr_setup);
+void gp_cong(vector<db::Group> &groups, int iteration);

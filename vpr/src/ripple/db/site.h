@@ -51,7 +51,7 @@ public:
     Pack *pack;
     int x, y;
     int w, h;
-    int cur_cluster;//for io
+    int cur_cluster;//for io delete once bad mergegroup_to_site is deleted
     Site();
     Site(int x, int y, SiteType *sitetype);
     //~Site();

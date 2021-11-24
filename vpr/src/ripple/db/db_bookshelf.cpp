@@ -434,14 +434,14 @@ void bilf_models_in_pb_type(const t_pb_type* pb_type, map<string, int>& blif_mod
     }
 }
 
-bool Database::readArch(t_vpr_setup& vpr_setup, t_arch& arch) {
+bool Database::readArch(t_arch& arch) {
     /*
     readlib
     */
     
     Master* master = NULL;
     const t_model* cur_model;
-    cur_model = vpr_setup.user_models;
+    cur_model = vpr_setup->user_models;
     while (cur_model) {
         string cur_model_name;
         cur_model_name = cur_model->name;
@@ -478,10 +478,10 @@ bool Database::readArch(t_vpr_setup& vpr_setup, t_arch& arch) {
             cur_port = cur_port->next;
         }
         cur_model = cur_model->next;
-        gpSetting.num_models++;
+        num_models++;
     }
 
-    cur_model = vpr_setup.library_models;
+    cur_model = vpr_setup->library_models;
     while (cur_model) {
         string cur_model_name;
         cur_model_name = cur_model->name;
@@ -544,7 +544,7 @@ bool Database::readArch(t_vpr_setup& vpr_setup, t_arch& arch) {
             cur_port = cur_port->next;
         }
         cur_model = cur_model->next;
-        gpSetting.num_models++;
+        num_models++;
     }
     /*
     readlib
@@ -622,7 +622,7 @@ bool Database::readArch(t_vpr_setup& vpr_setup, t_arch& arch) {
             database.subtile_capacity[sitetype]=sub_tile_capacity;
             for (auto const& pb_type : sub_tile.equivalent_sites) {
                 //cout<<equivalent_site->name<<endl;
-                t_model* cur_model = vpr_setup.user_models;
+                t_model* cur_model = vpr_setup->user_models;
                 while (cur_model) {
                     int capacity = 1;
                     //string model_name=cur_model->name;
@@ -644,7 +644,7 @@ bool Database::readArch(t_vpr_setup& vpr_setup, t_arch& arch) {
                     }
                     cur_model = cur_model->next;
                 }
-                cur_model = vpr_setup.library_models;
+                cur_model = vpr_setup->library_models;
                 bool has_io_resource_added = false;
                 while (cur_model) {
                     int capacity = 1;
@@ -685,7 +685,7 @@ bool Database::readArch(t_vpr_setup& vpr_setup, t_arch& arch) {
                                 }
                             }
                             //write lutPerSlice in gpsettings
-                            gpSetting.lutPerSlice = capacity * 0.75;
+                            lutPerSlice = capacity * 0.75;
 
                         } else if (model_name == ".latch") {
                             Resource* resource = database.getResource(Resource::NameString2Enum("FF"));
@@ -700,7 +700,7 @@ bool Database::readArch(t_vpr_setup& vpr_setup, t_arch& arch) {
                             } else {
                                 resource->addMaster(master);
                             }
-                            gpSetting.ffPerSlice = capacity * 0.75;
+                            ffPerSlice = capacity * 0.75;
                         }
                     }
                     cur_model = cur_model->next;

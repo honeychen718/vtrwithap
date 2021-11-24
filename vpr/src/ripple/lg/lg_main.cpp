@@ -190,7 +190,7 @@ bool vpr_start_new_cluster( VPR_CLB* &clb,t_pack_molecule* molecule,t_packer_opt
             pack_result = try_pack_molecule(cluster_placement_stats_ptr,
                                 atom_molecules,
                                 molecule, primitives_list, pb,
-                                gpSetting.num_models, max_cluster_size, clb_index,
+                                database.num_models, max_cluster_size, clb_index,
                                 1,//detailed_routing_stage, set to 1 for now
                                 router_data,
                                 packer_opts.pack_verbosity,
@@ -257,6 +257,7 @@ bool ExceedClkrgn(Group& group, vector<Site*>& candSites) {
     return true;
 }
 
+/*
 bool Legalizer::MergeGroupToSite(Site* site, Group& group, bool fixDspRam) {
     if (site->pack == NULL) {
         database.place(database.addPack(site->type), site->x, site->y);
@@ -280,6 +281,25 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group, bool fixDspRam) {
     }
     return false;
 }
+*/
+
+bool Legalizer::MergeGroupToSite(Site* site, Group& group, bool fixDspRam) {
+    if (site->pack == NULL) {
+        database.place(database.addPack(site->type), site->x, site->y);
+    }
+    auto& type = site->type->name;
+
+    if (type != SiteType::EMPTY) {
+        lgData.invokeCount++;
+        for (int i = 0; i < database.subtile_capacity[site->type]; i++) {
+            if (lgData.clbMap[site->x][site->y][i].AddInsts(group)) {
+                lgData.successCount++;
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 bool Legalizer::MergeMoleculeToSite(Site* site, t_pack_molecule* molecule, 
                                 bool fixDspRam,t_packer_opts& packer_opts,
@@ -289,9 +309,10 @@ bool Legalizer::MergeMoleculeToSite(Site* site, t_pack_molecule* molecule,
                                  t_pb_graph_node** primitives_list,
                                  int max_cluster_size,ClusteredNetlist* clb_nlist,
                                  std::map<t_logical_block_type_ptr, size_t>& num_used_type_instances,
-                                 const std::unordered_set<AtomNetId>& is_clock,
+                                 //const std::unordered_set<AtomNetId>& is_clock,
                                  //const t_pack_high_fanout_thresholds& high_fanout_thresholds,
-                                 std::shared_ptr<SetupTimingInfo>& timing_info,const t_ext_pin_util_targets& ext_pin_util_targets,
+                                 //std::shared_ptr<SetupTimingInfo>& timing_info,
+                                 const t_ext_pin_util_targets& ext_pin_util_targets,
                                  //vtr::vector<ClusterBlockId, std::vector<t_intra_lb_net>*>& intra_lb_routing,
                                  vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
                                  t_logical_block_type_ptr& logic_block_type,t_pb_type* le_pb_type,
@@ -302,13 +323,13 @@ bool Legalizer::MergeMoleculeToSite(Site* site, t_pack_molecule* molecule,
     if (site->pack == NULL) {
         database.place(database.addPack(site->type), site->x, site->y);
     }
-    if(site==database.getSite(14,0)){
-        cout<<"find site"<<endl;
-    }
-    AtomBlockId target_blk_id = AtomBlockId(162);
-    if(molecule->atom_block_ids[0]==target_blk_id){
-        cout<<"find blk"<<endl;
-    }
+    // if(site==database.getSite(14,0)){
+    //     cout<<"find site"<<endl;
+    // }
+    // AtomBlockId target_blk_id = AtomBlockId(162);
+    // if(molecule->atom_block_ids[0]==target_blk_id){
+    //     cout<<"find blk"<<endl;
+    // }
 //****************************
     // t_cluster_placement_stats *cluster_placement_stats;
     // t_pb_graph_node** primitives_list;
@@ -388,7 +409,7 @@ bool Legalizer::MergeMoleculeToSite(Site* site, t_pack_molecule* molecule,
                                         molecule,
                                         primitives_list,
                                         cluster_ctx.clb_nlist.block_pb(clb_index),
-                                        gpSetting.num_models,
+                                        database.num_models,
                                         max_cluster_size,
                                         clb_index,
                                         1,//detailed_routing_stage set to 1
@@ -619,27 +640,28 @@ bool Legalizer::RunAll(lgSiteOrder siteOrder, lgGroupOrder groupOrder) {
                     isPlaced = true;
                     lgData.PartialUpdate(group, curSite);
 
-                    double disp = abs((int)group.x - (int)lgData.groupsX[group.id]) * 0.5 +
+                    double disp = abs((int)group.x - (int)lgData.groupsX[group.id])  +
                                   abs((int)group.y - (int)lgData.groupsY[group.id]);
-                    if (disp != 0 && database.crmap_nx != 0) {
-                        int len = ChainMove(group, DISP_OPT);
-                        if (len != -1) {
-                            nSucc++;
-                            chainLen += len;
-                        }
-                        nChain++;
-                    }
+                    //delete by jia because no clock region!!!
+                    // if (disp != 0 && database.crmap_nx != 0) {
+                    //     int len = ChainMove(group, DISP_OPT);
+                    //     if (len != -1) {
+                    //         nSucc++;
+                    //         chainLen += len;
+                    //     }
+                    //     nChain++;
+                    // }
 
-                    disp = abs((int)group.x - (int)lgData.groupsX[group.id]) * 0.5 +
-                           abs((int)group.y - (int)lgData.groupsY[group.id]);
-                    if (disp >= 2 && database.crmap_nx != 0) {
-                        int len = ChainMove(group, MAX_DISP_OPT);
-                        if (len != -1) {
-                            nSucc++;
-                            chainLen += len;
-                        }
-                        nChain++;
-                    }
+                    // disp = abs((int)group.x - (int)lgData.groupsX[group.id]) +
+                    //        abs((int)group.y - (int)lgData.groupsY[group.id]);
+                    // if (disp >= 2 && database.crmap_nx != 0) {
+                    //     int len = ChainMove(group, MAX_DISP_OPT);
+                    //     if (len != -1) {
+                    //         nSucc++;
+                    //         chainLen += len;
+                    //     }
+                    //     nChain++;
+                    // }
                 }
             }
         }
@@ -758,7 +780,8 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
                 if(!MergeMoleculeToSite(curSite, group.vpr_molecule, false,packer_opts,
                                 lb_type_rr_graphs,atom_molecules,
                                 primitives_list,max_cluster_size,clb_nlist,num_used_type_instances,
-                                is_clock,timing_info,ext_pin_util_targets,
+                                //is_clock,timing_info,
+                                ext_pin_util_targets,
                                 //intra_lb_routing,
                                 clb_inter_blk_nets,logic_block_type,
                                 le_pb_type,le_count,num_clb,primitive_candidate_block_types,
@@ -805,6 +828,8 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
                         }
                         nChain++;
                     }
+                    lgData.clbMap[curSite->x][curSite->y][curSite->cur_cluster].AddInsts(group);
+
                 }
             }
         }
@@ -874,13 +899,6 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
         }
     }
     //free_cluster_placement_stats(cluster_placement_stats);
-
-
-
-
-        
-    
-
     printlog(LOG_INFO,
              "chain move: avgLen=%.2f, #fail=%d, #success=%d(%.2f%%)",
              chainLen * 1.0 / nSucc,

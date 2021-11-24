@@ -369,7 +369,7 @@ bool vpr_flow(t_vpr_setup& vpr_setup, t_arch& arch) {
     }
 
     {
-        bool ripple_success=ripple_fpga_main(vpr_setup,arch );
+        bool ripple_success=ripple_fpga_main(&vpr_setup,arch );
 
         if(!ripple_success){
             return false;

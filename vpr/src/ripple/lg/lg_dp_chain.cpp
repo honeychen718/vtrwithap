@@ -264,7 +264,7 @@ bool ChainFinder::DFS(DPBle& dpBle) {
         }
     }
     function<double(Site*)> cal_disp = [&](Site* site) {
-        return 0.5 * abs(groups[gid2Move].x - site->cx()) + abs(groups[gid2Move].y - site->cy());
+        return abs(groups[gid2Move].x - site->cx()) + abs(groups[gid2Move].y - site->cy());
     };
     ComputeAndSort(sites, cal_disp, less<double>());
 

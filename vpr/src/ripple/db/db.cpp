@@ -106,6 +106,7 @@ Instance *Database::addInstance(const Instance &instance) {
     }
     Instance *newinstance = new Instance(instance);
     name_instances[instance.name] = newinstance;
+    atom_instances[instance.vpratomblkid]=newinstance;
     instances.push_back(newinstance);
     return newinstance;
 }
@@ -186,6 +187,15 @@ Instance *Database::getInstance(const string &name) {
     }
     return mi->second;
 }
+
+Instance *Database::getInstance(const AtomBlockId & atom) {
+    auto mi = atom_instances.find(atom);
+    if (mi == atom_instances.end()) {
+        return NULL;
+    }
+    return mi->second;
+}
+
 Net *Database::getNet(const string &name) {
     auto mi = name_nets.find(name);
     if (mi == name_nets.end()) {
