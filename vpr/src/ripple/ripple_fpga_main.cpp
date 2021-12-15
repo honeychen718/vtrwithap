@@ -14,7 +14,7 @@ Setting setting;
 //bool get_args(int argc, char** argv);
 
 //int main(int argc, char** argv) {
-bool ripple_fpga_main(t_vpr_setup* vpr_setup_in,t_arch& arch) {
+bool ripple_fpga_main(t_vpr_setup* vpr_setup_in,t_arch* arch) {
     // init_log(LOG_ALL);
     init_log(LOG_NORMAL);
 
@@ -31,7 +31,8 @@ bool ripple_fpga_main(t_vpr_setup* vpr_setup_in,t_arch& arch) {
     //database.readNets(setting.io_nets);
 
     database.vpr_setup=vpr_setup_in;
-    database.readArch(arch);
+    database.arch=arch;
+    database.readArch();
 
     database.setup();
     database.print();
@@ -72,6 +73,8 @@ bool ripple_fpga_main(t_vpr_setup* vpr_setup_in,t_arch& arch) {
     // }
 
     // gp with bles
+    database.setuppackvar(groups);
+
     gpSetting.set2();
     gplace(groups);
     if (database.crmap_nx == 0) {
@@ -97,6 +100,7 @@ bool ripple_fpga_main(t_vpr_setup* vpr_setup_in,t_arch& arch) {
     printlog(LOG_INFO, "#net = %d / %d", database.getRouteNet(), database.nets.size());
 
     database.draw("cells.png", Database::DrawInstances);
+    database.freepackvar();
 
     log() << "-----------------------------------" << endl;
     log() << "    RippleFPGA terminating...      " << endl;

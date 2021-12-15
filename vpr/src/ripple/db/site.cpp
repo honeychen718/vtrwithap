@@ -137,13 +137,26 @@ void Pack::print() {
     printlog(LOG_INFO, "(x,y)=(%lf,%lf), %d instances=[%s]", site->cx(), site->cy(), nInst, instList.c_str());
 }
 
+// bool Pack::IsEmpty() {
+//     bool isEmptyPack = true;
+//     for (auto inst : instances) {
+//         if (inst != NULL) {
+//             isEmptyPack = false;
+//             break;
+//         }
+//     }
+//     return isEmptyPack;
+// }
+
 bool Pack::IsEmpty() {
-    bool isEmptyPack = true;
-    for (auto inst : instances) {
-        if (inst != NULL) {
-            isEmptyPack = false;
+    return instances.size() == 0;
+}
+
+void Pack::RemoveInst(Instance *inst){
+    for(vector<Instance *>::iterator iter=instances.begin();iter!=instances.end();iter++){ 
+        if(*iter == inst){
+            instances.erase(iter);
             break;
         }
     }
-    return isEmptyPack;
 }

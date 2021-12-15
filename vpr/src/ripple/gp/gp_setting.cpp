@@ -20,17 +20,17 @@ void GPSetting::init() {
         }
     }
     unsigned numLUT = 2 * numLUT6 + numLUT15;
-    lutArea = double(max(numFF / ffPerSlice, numLUT / lutPerSlice)) / (numFF + numLUT);
+    lutArea = double(max(numFF / database.ffPerSlice, numLUT / database.lutPerSlice)) / (numFF + numLUT);
     ffArea = lutArea;
-    printlog(LOG_INFO, "LUTs require %d slices, FFs require %d slices", numLUT / lutPerSlice, numFF / ffPerSlice);
+    printlog(LOG_INFO, "LUTs require %d slices, FFs require %d slices", numLUT / database.lutPerSlice, numFF / database.ffPerSlice);
     printlog(LOG_INFO,
              "LUT area is %lf ( x %d = %lf), FF area is %lf ( x %d = %lf)",
              lutArea,
-             lutPerSlice,
-             lutPerSlice * lutArea,
+             database.lutPerSlice,
+             database.lutPerSlice * lutArea,
              ffArea,
-             ffPerSlice,
-             ffPerSlice * ffArea);
+             database.ffPerSlice,
+             database.ffPerSlice * ffArea);
 
     if (database.instances.size() < 10000)
         areaScale = (database.crmap_nx == 0) ? 1.2 : 1.1;

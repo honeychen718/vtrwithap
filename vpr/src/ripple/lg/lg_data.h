@@ -5,6 +5,10 @@
 #include "../global.h"
 #include "../pack/clb.h"
 #include "lg.h"
+#include "vtr_assert.h"
+// #include "echo_files.h"
+// #include "output_clustering.h"
+#include "vpr_pack_data.h"
 
 using namespace db;
 
@@ -16,6 +20,7 @@ private:
     void InitGroupInfo();
     void InitLGStat();
     void InitClkInfo();
+    void InitPackVar();//added by jia 
 
     void Group2Pack();
     void UpdateGroupXY();
@@ -29,6 +34,10 @@ public:
     vector<vector<vector<int>>> groupMap;
     vector<vector<vector<int>>> placedGroupMap;
     vector<vector<VPR_CLB *>> clbMap;
+
+
+    VPR_Pack_Data packdata;
+    void freeclbdata();
 
     vector<DynamicBox<double>> netBox;
 
@@ -54,6 +63,9 @@ public:
     void GetDispStatics();
     void GetPackStatics();
     double GetHpwl();
+
+    //for congestion adjust
+    bool writeclbnets;
 };
 
 #endif

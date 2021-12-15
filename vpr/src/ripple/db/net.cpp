@@ -72,3 +72,11 @@ void Net::addPin(Pin *pin) {
     pins.push_back(pin);
     pin->net = this;
 }
+
+void ClbNet::addsite(Site* site){
+    sites.push_back(site);
+}
+
+ClbNet::ClbNet(const string &name){
+    this->name=name;
+}

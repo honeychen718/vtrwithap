@@ -8,6 +8,14 @@
 #include "swbox.h"
 #include "group.h"
 #include "clkrgn.h"
+#include "timing_info.h"
+#include "prepack.h"
+#include "pack.h"
+#include "PreClusterDelayCalculator.h"
+#include "PreClusterTimingGraphResolver.h"
+#include "cluster.h"
+#include "tatum/TimingReporter.hpp"
+#include "cluster_placement.h"
 
 using namespace std;
 
@@ -36,24 +44,29 @@ public:
 
     //vpr setup added by jia
     t_vpr_setup* vpr_setup;
+    t_arch* arch;
 
-    //vpr_pack added by jia 
-    int num_clb = 0;
 
     //atom
     std::multimap<AtomBlockId, t_pack_molecule*> atom_molecules;
 
     //about pack
-    int max_cluster_size;
-    bool balance_block_type_util;
-    t_pb_graph_node** primitives_list;
-    std::unordered_set<AtomNetId> is_clock;
-    std::shared_ptr<SetupTimingInfo> timing_info;
-    t_ext_pin_util_targets target_external_pin_util;
-    t_cluster_placement_stats* cluster_placement_stats;
-    t_pack_high_fanout_thresholds high_fanout_thresholds;
-    std::map<t_logical_block_type_ptr, size_t> num_used_type_instances;
-    std::map<const t_model*, std::vector<t_logical_block_type_ptr>> primitive_candidate_block_types;
+    bool balance_block_type_util; //before do clustering
+    std::unordered_set<AtomNetId> is_clock;//before do clustering
+    t_pack_molecule* list_of_pack_molecules;//molecule_head
+    t_ext_pin_util_targets target_external_pin_util;//dont know
+    t_pack_high_fanout_thresholds high_fanout_thresholds;//before do clustering 
+    std::unordered_map<AtomBlockId, t_pb_graph_node*> expected_lowest_cost_pb_gnode;//before do clustering
+    void setuppackvar(vector<Group>& groups);
+    void freepackvar();
+
+    //for congestion adjest
+    vector<ClbNet*> clbnets;
+    unordered_map<string, ClbNet*> name_clbnets;
+    unordered_map<ClusterBlockId,Site*> clusterblockid_site;
+    void writeclbnets();
+    ClbNet* get_net(const string &name);
+    ClbNet* create_net(const string &name);
 
     unsigned ffPerSlice, lutPerSlice;//added by jia
 
@@ -77,6 +90,8 @@ public:
     void setSiteMap(int nx, int ny);
     bool place(Instance* instance, int x, int y, int slot);
     bool place(Instance* instance, Site* site, int slot);
+    bool place(Instance* instance, int x, int y);
+    bool place(Instance* instance, Site* site);
     bool unplace(Instance* instance);
     bool unplaceAll();
     bool place(Pack* pack, int x, int y);
@@ -164,7 +179,7 @@ public:
     bool readScl(string file);
     bool readLib(string file);
     bool writePl(string file);
-    bool readArch(t_arch& arch);
+    bool readArch();
 
     /***** Drawing (defined in db_draw.cpp *****/
     enum DrawType {

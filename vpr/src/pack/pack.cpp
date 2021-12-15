@@ -22,6 +22,8 @@
 #include "read_blif.h"
 #include "cluster.h"
 #include "SetupGrid.h"
+//for debug
+// #include "DebugNew.h"
 
 /* #define DUMP_PB_GRAPH 1 */
 /* #define DUMP_BLIF_INPUT 1 */

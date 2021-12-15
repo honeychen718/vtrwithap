@@ -1,4 +1,6 @@
 #include "db.h"
+//for debug
+//#include "DebugNew.h"
 
 using namespace db;
 
@@ -26,6 +28,7 @@ Database::~Database() {
         for (unsigned int j = 0; j < sites[i].size(); ++j)
             if (j == 0 || sites[i][j] != sites[i][j - 1]) delete sites[i][j];
     if (canvas) delete canvas;
+    for (auto cn : clbnets) delete cn;
 }
 
 void Database::setup() {
@@ -273,11 +276,30 @@ bool Database::place(Instance *instance, Site *site, int slot) {
     return true;
 }
 
+bool Database::place(Instance *instance, int x, int y) {
+    Site *site = getSite(x, y);
+    return place(instance, site);
+}
+
+bool Database::place(Instance *instance, Site *site) {
+    if (site == NULL) {
+        return false;
+    }
+    if (site->pack == NULL) {
+        site->pack = addPack(site->type);
+        site->pack->site = site;
+    }
+    site->pack->instances.push_back(instance);
+    instance->pack = site->pack;
+    instance->slot = -2;
+    return true;
+}
+
 bool Database::unplace(Instance *instance) {
     if (instance->pack == NULL) {
         return false;
     }
-    instance->pack->instances[instance->slot] = NULL;
+    instance->pack->RemoveInst(instance);
     instance->pack = NULL;
     instance->slot = -1;
     return true;
@@ -905,4 +927,183 @@ int db::NumDupInputs(const Instance &lhs, const Instance &rhs) {
 bool db::IsLUTCompatible(const Instance &lhs, const Instance &rhs) {
     int tot = lhs.pins.size() + rhs.pins.size();
     return (tot <= 7) || (tot - 2 - db::NumDupInputs(lhs, rhs) <= 5);
+}
+
+t_pack_molecule* TurnGroupsIntoMolecules(vector<Group>& groups,
+                                        std::multimap<AtomBlockId, t_pack_molecule*>& atom_molecules,
+                                        std::unordered_map<AtomBlockId, t_pb_graph_node*>& expected_lowest_cost_pb_gnode){
+    int num_blocks;
+    t_pack_molecule* list_of_molecules_head;
+    t_pack_molecule* cur_molecule;
+    cur_molecule = list_of_molecules_head = nullptr;
+    for(Group& group:groups){
+        num_blocks=group.instances.size();
+        cur_molecule = new t_pack_molecule;
+        cur_molecule->valid = true;
+        cur_molecule->type = (num_blocks>1) ? MOLECULE_TRANSFORMED_FROM_GROUP : MOLECULE_SINGLE_ATOM;
+        cur_molecule->atom_block_ids = std::vector<AtomBlockId>(num_blocks); //Initializes invalid
+        cur_molecule->num_blocks = num_blocks;
+        cur_molecule->root = 0;
+        cur_molecule->pack_pattern = nullptr;
+
+        for(int i=0; i<num_blocks; ++i){
+            Instance* &inst = group.instances[i];
+            cur_molecule->atom_block_ids[i]=inst->vpratomblkid;
+            atom_molecules.insert({inst->vpratomblkid, cur_molecule});
+            //cout<<Master::NameEnum2String(inst->master->name)<<"\t";
+        }
+
+        cur_molecule->next = list_of_molecules_head;
+        cur_molecule->base_gain = num_blocks>1 ? 0.99 : 1.0;
+        list_of_molecules_head = cur_molecule;
+
+        group.vpr_molecule=cur_molecule;
+        //cout<<endl;
+
+    }
+
+    for (auto blk_id : g_vpr_ctx.atom().nlist.blocks()) {
+        t_pb_graph_node* best = get_expected_lowest_cost_primitive_for_atom_block(blk_id);
+        if (!best) {
+            /* Free the molecules in the linked list to avoid memory leakage */
+            cur_molecule = list_of_molecules_head;
+            while (cur_molecule) {
+                t_pack_molecule* molecule_to_free = cur_molecule;
+                cur_molecule = cur_molecule->next;
+                delete molecule_to_free;
+            }
+
+            VPR_FATAL_ERROR(VPR_ERROR_PACK, "Failed to find any location to pack primitive of type '%s' in architecture",
+                            g_vpr_ctx.atom().nlist.block_model(blk_id)->name);
+        }
+
+        VTR_ASSERT_SAFE(nullptr != best);
+
+        expected_lowest_cost_pb_gnode[blk_id] = best;
+    }
+
+    return list_of_molecules_head;
+}
+
+void Database::setuppackvar(vector<Group>& groups){
+
+    auto& atom_ctx = g_vpr_ctx.atom();
+    t_packer_opts &packer_opts =vpr_setup->PackerOpts;
+
+    //before do_clustering
+    is_clock = alloc_and_load_is_clock(packer_opts.global_clocks);
+    
+    list_of_pack_molecules=TurnGroupsIntoMolecules(groups,
+                                                    database.atom_molecules,
+                                                    expected_lowest_cost_pb_gnode);
+    target_external_pin_util = parse_target_external_pin_util(packer_opts.target_external_pin_util);
+    high_fanout_thresholds = parse_high_fanout_thresholds(packer_opts.high_fanout_threshold);
+    
+    if (packer_opts.balance_block_type_utilization == e_balance_block_type_util::ON) {
+        balance_block_type_util = true;
+    } else if (packer_opts.balance_block_type_utilization == e_balance_block_type_util::OFF) {
+        balance_block_type_util = false;
+    }
+}
+
+void Database::freepackvar(){
+    free_pack_molecules(list_of_pack_molecules);
+}
+
+ClbNet* Database::get_net(const string &name){
+    auto mi = name_clbnets.find(name);
+    if (mi == name_clbnets.end()) {
+        return NULL;
+    }
+    return mi->second;
+}
+
+ClbNet* Database::create_net(const string &name){
+    ClbNet* net=get_net(name);
+    if(net == NULL){
+        net = new ClbNet(name);
+        name_clbnets[name] = net;
+        clbnets.push_back(net);
+    }
+    return net;
+}
+
+void Database::writeclbnets(){
+    auto& atom_ctx = g_vpr_ctx.atom();
+    auto& cluster_ctx = g_vpr_ctx.mutable_clustering();
+    ClusteredNetlist& clb_nlist = cluster_ctx.clb_nlist;
+
+    ClbNet* net;
+    int j, k, ipin;
+    t_pb_graph_pin* pb_graph_pin;
+    t_logical_block_type_ptr block_type;
+
+    for (auto blk_id : clb_nlist.blocks()) {
+        block_type = clb_nlist.block_type(blk_id);
+        const t_pb* pb = clb_nlist.block_pb(blk_id);
+
+        ipin = 0;
+        VTR_ASSERT(block_type->pb_type->num_input_pins
+                       + block_type->pb_type->num_output_pins
+                       + block_type->pb_type->num_clock_pins
+                   == block_type->pb_type->num_pins);
+
+        int num_input_ports = pb->pb_graph_node->num_input_ports;
+        int num_output_ports = pb->pb_graph_node->num_output_ports;
+        int num_clock_ports = pb->pb_graph_node->num_clock_ports;
+
+        //Load the external nets connected to input ports
+        for (j = 0; j < num_input_ports; j++) {
+            ClusterPortId input_port_id = clb_nlist.find_port(blk_id, block_type->pb_type->ports[j].name);
+            for (k = 0; k < pb->pb_graph_node->num_input_pins[j]; k++) {
+                pb_graph_pin = &pb->pb_graph_node->input_pins[j][k];
+                VTR_ASSERT(pb_graph_pin->pin_count_in_cluster == ipin);
+
+                if (pb->pb_route.count(pb_graph_pin->pin_count_in_cluster)) {
+                    AtomNetId atom_net_id = pb->pb_route[pb_graph_pin->pin_count_in_cluster].atom_net_id;
+                    if (atom_net_id) {
+                        net = create_net(atom_ctx.nlist.net_name(atom_net_id));
+                        net->addsite(clusterblockid_site[blk_id]);
+                    }
+                }
+                ipin++;
+            }
+        }
+
+        //Load the external nets connected to output ports
+        for (j = 0; j < num_output_ports; j++) {
+            ClusterPortId output_port_id = clb_nlist.find_port(blk_id, block_type->pb_type->ports[j + num_input_ports].name);
+            for (k = 0; k < pb->pb_graph_node->num_output_pins[j]; k++) {
+                pb_graph_pin = &pb->pb_graph_node->output_pins[j][k];
+                VTR_ASSERT(pb_graph_pin->pin_count_in_cluster == ipin);
+
+                if (pb->pb_route.count(pb_graph_pin->pin_count_in_cluster)) {
+                    AtomNetId atom_net_id = pb->pb_route[pb_graph_pin->pin_count_in_cluster].atom_net_id;
+                    if (atom_net_id) {
+                        net = create_net(atom_ctx.nlist.net_name(atom_net_id));
+                        net->addsite(clusterblockid_site[blk_id]);
+                    }
+                }
+                ipin++;
+            }
+        }
+
+        //Load the external nets connected to clock ports
+        for (j = 0; j < num_clock_ports; j++) {
+            ClusterPortId clock_port_id = clb_nlist.find_port(blk_id, block_type->pb_type->ports[j + num_input_ports + num_output_ports].name);
+            for (k = 0; k < pb->pb_graph_node->num_clock_pins[j]; k++) {
+                pb_graph_pin = &pb->pb_graph_node->clock_pins[j][k];
+                VTR_ASSERT(pb_graph_pin->pin_count_in_cluster == ipin);
+
+                if (pb->pb_route.count(pb_graph_pin->pin_count_in_cluster)) {
+                    AtomNetId atom_net_id = pb->pb_route[pb_graph_pin->pin_count_in_cluster].atom_net_id;
+                    if (atom_net_id) {
+                        net = create_net(atom_ctx.nlist.net_name(atom_net_id));
+                        net->addsite(clusterblockid_site[blk_id]);
+                    }
+                }
+                ipin++;
+            }
+        }
+    }
 }

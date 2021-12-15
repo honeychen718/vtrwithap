@@ -85,6 +85,8 @@ ClusteredNetlist read_netlist(const char* net_file,
     //Save an identifier for the netlist based on it's contents
     auto clb_nlist = ClusteredNetlist(net_file, vtr::secure_digest_file(net_file));
 
+    int clbnetsize=clb_nlist.nets().size();
+
     pugi::xml_document doc;
     pugiutil::loc_data loc_data;
     try {

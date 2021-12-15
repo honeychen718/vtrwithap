@@ -21,6 +21,13 @@ void SqueezeCandSites(vector<Site*>& candSites, const Group& group, bool rmDup) 
             return a->x < b->x || (a->x == b->x && a->y < b->y);
         });  // avoid machine diff
     }
+
+    for (vector<Site*>::iterator iter = candSites.begin();iter!=candSites.end();iter++){
+        if( (*iter)->type->name == SiteType::EMPTY ){
+            candSites.erase(iter);
+            iter--;
+        }
+    }
 }
 
 // squeeze out the duplicate and wrong type cand sites

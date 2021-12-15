@@ -29,6 +29,8 @@
 #include "prepack.h"
 #include "vpr_utils.h"
 #include "echo_files.h"
+//for debug
+// #include "DebugNew.h"
 
 /*****************************************/
 /*Local Function Declaration			 */

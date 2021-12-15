@@ -67,6 +67,8 @@
 #include "tatum/echo_writer.hpp"
 #include "tatum/report/graphviz_dot_writer.hpp"
 #include "tatum/TimingReporter.hpp"
+//for debug
+// #include "DebugNew.h"
 
 #define AAPACK_MAX_HIGH_FANOUT_EXPLORE 10 /* For high-fanout nets that are ignored, consider a maximum of this many sinks, must be less than packer_opts.feasible_block_array_size */
 #define AAPACK_MAX_TRANSITIVE_EXPLORE 40  /* When investigating transitive fanout connections in packing, consider a maximum of this many molecules, must be less than packer_opts.feasible_block_array_size */
@@ -309,7 +311,7 @@ static t_pack_molecule* get_molecule_for_cluster(t_pb* cur_pb,
 
 // static void check_clustering();
 
-static void echo_clusters(char* filename);
+// static void echo_clusters(char* filename);
 
 static void check_cluster_atom_blocks(t_pb* pb, std::unordered_set<AtomBlockId>& blocks_checked);
 
@@ -362,7 +364,7 @@ static void print_pb_type_count_recurr(t_pb_type* type, size_t max_name_chars, s
 
 static bool pb_used_for_blif_model(const t_pb* pb, std::string blif_model_name);
 
-static void print_le_count(std::vector<int>& le_count, const t_pb_type* le_pb_type);
+// static void print_le_count(std::vector<int>& le_count, const t_pb_type* le_pb_type);
 
 /*****************************************/
 /*globally accessible function*/
@@ -2669,7 +2671,7 @@ void check_clustering() {
 }
 
 /*Print the contents of each cluster to an echo file*/
-static void echo_clusters(char* filename) {
+void echo_clusters(char* filename) {
     FILE* fp;
     fp = vtr::fopen(filename, "w");
 
@@ -3109,7 +3111,9 @@ static float get_molecule_gain(t_pack_molecule* molecule, std::map<AtomBlockId, 
 }
 
 static int compare_molecule_gain(const void* a, const void* b) {
-    float base_gain_a, base_gain_b, diff;
+    float base_gain_a = 0.0;
+    float base_gain_b = 0.0;
+    float diff = 0.0;
     const t_pack_molecule *molecule_a, *molecule_b;
     molecule_a = (*(const t_pack_molecule* const*)a);
     molecule_b = (*(const t_pack_molecule* const*)b);
@@ -3876,7 +3880,7 @@ static bool pb_used_for_blif_model(const t_pb* pb, std::string blif_model_name) 
 /**
  * Print the LE count data strurture
  */
-static void print_le_count(std::vector<int>& le_count, const t_pb_type* le_pb_type) {
+void print_le_count(std::vector<int>& le_count, const t_pb_type* le_pb_type) {
     VTR_LOG("\nLogic Element (%s) detailed count:\n", le_pb_type->name);
     VTR_LOG("  Total number of Logic Elements used : %d\n", le_count[0] + le_count[1] + le_count[2]);
     VTR_LOG("  LEs used for logic and registers    : %d\n", le_count[0]);

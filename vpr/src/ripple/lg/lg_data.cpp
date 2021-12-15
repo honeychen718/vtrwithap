@@ -1,5 +1,7 @@
 #include "./lg_data.h"
 #include "../gp/gp_setting.h"
+//for debug
+// #include "DebugNew.h"
 
 using namespace db;
 
@@ -19,10 +21,9 @@ void LGData::GetDispStatics() {
 
         // scale to hpwl calc method
         if (group.GetSiteType() != SiteType::SLICE) {
-            disp = abs(targetSite->x - database.getSite(orgX, orgY)->x) +
-                   abs(targetSite->y - database.getSite(orgX, orgY)->y);
+            disp = abs(targetSite->x - database.getSite(orgX, orgY)->x) + abs(targetSite->y - database.getSite(orgX, orgY)->y);
         } else {
-            disp = abs(targetSite->x - orgX)  + abs(targetSite->y - orgY);
+            disp = abs(targetSite->x - orgX) + abs(targetSite->y - orgY);
         }
 
         dispPerSite[orgX][orgY] += disp;
@@ -200,6 +201,10 @@ void LGData::InitLGStat() {
     dispPerGroup.assign(groups.size(), 0.0);
 }
 
+void LGData::InitPackVar(){
+
+}
+
 void LGData::Init(lgPackMethod packMethod) {
     database.unplaceAll();
     database.ClearEmptyPack();
@@ -228,16 +233,21 @@ void LGData::Init(lgPackMethod packMethod) {
 
     clbMap.assign(database.sitemap_nx, vector<VPR_CLB*>(database.sitemap_ny, NULL));
 
+    packdata.Init();
+
     // assign clb to slice
-    SiteType *st;
+    SiteType* st;
     for (int x = 0; x < database.sitemap_nx; x++) {
         for (int y = 0; y < database.sitemap_ny; y++) {
-            st=database.getSite(x, y)->type;
+            st = database.getSite(x, y)->type;
             if (st->name != SiteType::EMPTY) {
-                if (packMethod == USE_VPR_CLB)
+                if (packMethod == USE_VPR_CLB){
                     clbMap[x][y] = new VPR_CLB[database.subtile_capacity[st]];
-                    //clbMap[x][y]->type=g_vpr_ctx.mutable_device().grid[x][y].type;
-                else
+                    for(int i =0 ; i <database.subtile_capacity[st];i++){
+                        clbMap[x][y][i].site=database.getSite(x,y);
+                        clbMap[x][y][i].packdata=&packdata;
+                    }
+                }else
                     printlog(LOG_ERROR, "wrong pack method");
             }
         }
@@ -247,7 +257,8 @@ void LGData::Init(lgPackMethod packMethod) {
     // cout<<sizeof(*clbMap[1][1])<<endl;
 }
 
-LGData::LGData(vector<Group>& _groups) : groups(_groups) {}
+LGData::LGData(vector<Group>& _groups)
+    : groups(_groups) {}
 
 void LGData::Group2Pack() {
     groups.clear();
@@ -260,7 +271,8 @@ void LGData::Group2Pack() {
     }
     groupMap.clear();
     groupMap.resize(database.sitemap_nx, vector<vector<int>>(database.sitemap_ny));
-    for (const auto& g : groups) groupMap[g.x][g.y].push_back(g.id);
+    for (const auto& g : groups)
+        groupMap[g.x][g.y].push_back(g.id);
 }
 
 void LGData::UpdateGroupXY() {
@@ -291,21 +303,22 @@ void LGData::UpdateGroupXYnOrder() {
     groups = move(tmpGroups);
 
     groupMap.assign(database.sitemap_nx, vector<vector<int>>(database.sitemap_ny));
-    for (auto group : groups) groupMap[group.x][group.y].push_back(group.id);
+    for (auto group : groups)
+        groupMap[group.x][group.y].push_back(group.id);
 }
 
-void LGData::GetResult(lgRetrunGroup retGroup) {//todo: a lot!!!!!!!!!!
+void LGData::GetResult(lgRetrunGroup retGroup) { 
     // transform clb to pack
     SiteType* siteslice = database.getSiteType(SiteType::NameString2Enum("SLICE"));
-    int numresourceinslice=siteslice->resources.size();
+    int numresourceinslice = siteslice->resources.size();
     for (int x = 0; x < database.sitemap_nx; x++) {
         for (int y = 0; y < database.sitemap_ny; y++) {
-            if (clbMap[x][y] != NULL && !clbMap[x][y]->IsEmpty()) {
-                Group tmpGroup;
-                clbMap[x][y]->GetResult(tmpGroup);
-                for (int i = 0; i < numresourceinslice; i++) {
-                    if (tmpGroup.instances[i] != NULL) {
-                        database.place(tmpGroup.instances[i], database.getSite(x, y), i);
+            for(int i = 0;i<database.subtile_capacity[database.getSite(x,y)->type];i++){
+                if (&clbMap[x][y][i] != NULL && !clbMap[x][y][i].IsEmpty()) {
+                    Group tmpGroup;
+                    clbMap[x][y][i].GetResult(tmpGroup);
+                    for (Instance* inst: tmpGroup.instances) {
+                        database.place(inst, database.getSite(x, y));
                     }
                 }
             }
@@ -324,9 +337,21 @@ void LGData::GetResult(lgRetrunGroup retGroup) {//todo: a lot!!!!!!!!!!
     else
         printlog(LOG_ERROR, "wrong usage in LGData::GetResult");
 
-    // clean up
+    // clean up //in do clustering while()
+    freeclbdata();
+    if (packdata.le_pb_type) {
+        print_le_count(packdata.le_count, packdata.le_pb_type);
+    }
+
+    //in do clustering at the end of while
+    packdata.Free(VPR_Pack_Data::FREE_ALL_FOR_REPACK);
+    
     for (int x = 0; x < database.sitemap_nx; x++) {
         for (int y = 0; y < database.sitemap_ny; y++) {
+            for(int i = 0;i<database.subtile_capacity[database.getSite(x,y)->type];i++){
+                free_router_data(clbMap[x][y][i].router_data);
+                clbMap[x][y][i].router_data=nullptr;
+            }
             delete[] clbMap[x][y];
         }
     }
@@ -351,4 +376,31 @@ void LGData::PartialUpdate(Group& group, Site* targetSite) {
     groupsX[gid] = tarX;
     groupsY[gid] = tarY;
     placedGroupMap[targetSite->x][targetSite->y].push_back(gid);
+}
+
+void LGData::freeclbdata() {
+    auto& atom_ctx = g_vpr_ctx.atom();
+    auto& cluster_ctx = g_vpr_ctx.mutable_clustering();
+
+    packdata.intra_lb_routing.assign(packdata.num_clb,nullptr);
+
+    for (int x = 0; x < database.sitemap_nx; x++) {
+        for (int y = 0; y < database.sitemap_ny; y++) {
+            for (int i = 0; i < database.subtile_capacity[database.getSite(x, y)->type]; i++) {
+                VPR_CLB* clb = &clbMap[x][y][i];
+                if (clb != nullptr && clb->valid) {
+                    packdata.intra_lb_routing[clb->index]=clb->router_data->saved_lb_nets;
+                    clb->router_data->saved_lb_nets = nullptr;
+                    t_pb_stats* pb_stats = cluster_ctx.clb_nlist.block_pb(clb->index)->pb_stats;
+
+                    auto cur_pb = cluster_ctx.clb_nlist.block_pb(clb->index);
+
+                    // update the data structure holding the LE counts
+                    update_le_count(cur_pb, packdata.logic_block_type, packdata.le_pb_type, packdata.le_count);
+                    free_pb_stats_recursive(cur_pb);
+                }
+            }
+        }
+    }
+    VTR_ASSERT((int)packdata.intra_lb_routing.size() == packdata.num_clb);
 }

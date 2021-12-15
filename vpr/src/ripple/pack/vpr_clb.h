@@ -4,6 +4,7 @@
 #include "cluster.h"
 #include "cluster_router.h"
 #include "cluster_placement.h"
+#include "vpr_pack_data.h"
 
 using namespace db;
 
@@ -37,7 +38,7 @@ public:
     ~VPR_CLB();
     bool AddInsts(const Group& group);
     //bool AddInsts(const Group& group,t_vpr_setup& vpr_setup);
-    inline bool IsEmpty(){}
+    bool IsEmpty();
     void GetResult(Group& group);
     void GetFinalResult(Group& group){}
     void Print() const{}
@@ -50,12 +51,14 @@ public:
     //bool IsEmpty(){return pb == nullptr;}
     //t_cluster_placement_stats* cluster_placement_stats;
     //add by jia 
-    bool valid;
-    bool is_full; //for io , delete it once bad merge group_to_site is deleted
+    bool valid = false;
+    bool is_full = false; //for io , delete it once bad merge group_to_site is deleted
     ClusterBlockId index;
-    t_lb_router_data* router_data;
+    t_lb_router_data* router_data=nullptr;
     PartitionRegion temp_cluster_pr;
     //map<int,cluster_placement_stats_for_ripple> type_index_to_cluster_placement_stats;
     map<int,map<t_pb_type*,map<t_pb_graph_node*,ripple_primitive_stats>>> type_index_to_cluster_placement_stats;
     vector<Instance*> instances;
+    Site* site;
+    VPR_Pack_Data* packdata;
 };

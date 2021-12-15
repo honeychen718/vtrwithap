@@ -71,6 +71,7 @@ public:
     int id;
     void print();
     bool IsEmpty();
+    void RemoveInst(Instance *inst);
     Pack();
     Pack(SiteType *type);
 };

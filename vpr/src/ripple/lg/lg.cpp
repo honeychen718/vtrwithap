@@ -39,7 +39,7 @@ void legalize_partial(vector<Group> &groups) {
     printlog(LOG_INFO, "");
     printlog(LOG_INFO, " = = = = legalize DSP and BRAM = = = = ");
     Legalizer legalizer(groups);
-    legalizer.Init(USE_CLB2);
+    legalizer.Init(USE_VPR_CLB);
 
     double begHpwl = legalizer.GetHpwl();
     legalizer.RunPartial();

@@ -434,7 +434,7 @@ void bilf_models_in_pb_type(const t_pb_type* pb_type, map<string, int>& blif_mod
     }
 }
 
-bool Database::readArch(t_arch& arch) {
+bool Database::readArch() {
     /*
     readlib
     */
@@ -709,7 +709,7 @@ bool Database::readArch(t_arch& arch) {
         }
     }
 
-    device_ctx.grid = create_device_grid("ripple", arch.grid_layouts);
+    device_ctx.grid = create_device_grid("ripple", database.arch->grid_layouts);
     //auto &grid=device_ctx.grid;
     //cout<<device_ctx.grid.width()<<"\t"<<device_ctx.grid.height()<<"\t"<<endl;
     int nx = device_ctx.grid.width();

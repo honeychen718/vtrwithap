@@ -6,3 +6,4 @@ class CongEstBB : public CongEstBase {
 private:
     void InitDemand();
 };
+

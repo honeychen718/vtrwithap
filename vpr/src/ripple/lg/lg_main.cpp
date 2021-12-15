@@ -7,6 +7,9 @@
 #include "vtr_math.h"
 #include "vpr_clb.h"
 
+//for debug
+// #include "DebugNew.h"
+
 const t_ext_pin_util FULL_EXTERNAL_PIN_UTIL(1., 1.);
 
 void read_cluster_placement_stats_from_clb( int type_index,
@@ -289,7 +292,19 @@ bool Legalizer::MergeGroupToSite(Site* site, Group& group, bool fixDspRam) {
     }
     auto& type = site->type->name;
 
-    if (type != SiteType::EMPTY) {
+    if (type == SiteType::IO) {
+        lgData.invokeCount++;
+        for (int i = 0; i < database.subtile_capacity[site->type]; i++) {
+            if(lgData.clbMap[site->x][site->y][i].is_full){
+                continue;
+            }
+            if (lgData.clbMap[site->x][site->y][i].AddInsts(group)) {
+                lgData.successCount++;
+                lgData.clbMap[site->x][site->y][i].is_full=true;
+                return true;
+            }
+        }
+    }else if(type != SiteType::EMPTY){
         lgData.invokeCount++;
         for (int i = 0; i < database.subtile_capacity[site->type]; i++) {
             if (lgData.clbMap[site->x][site->y][i].AddInsts(group)) {
@@ -314,9 +329,9 @@ bool Legalizer::MergeMoleculeToSite(Site* site, t_pack_molecule* molecule,
                                  //std::shared_ptr<SetupTimingInfo>& timing_info,
                                  const t_ext_pin_util_targets& ext_pin_util_targets,
                                  //vtr::vector<ClusterBlockId, std::vector<t_intra_lb_net>*>& intra_lb_routing,
-                                 vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
-                                 t_logical_block_type_ptr& logic_block_type,t_pb_type* le_pb_type,
-                                 std::vector<int>& le_count,int& num_clb,
+                                 //vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
+                                 //t_pb_type* le_pb_type,
+                                 int& num_clb,
                                  const std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types,
                                  bool balance_block_type_utilization,
                                  t_cluster_placement_stats* cluster_placement_stats) {
@@ -571,7 +586,7 @@ void Legalizer::Init(lgPackMethod packMethod) { lgData.Init(packMethod); }
 
 void Legalizer::GetResult(lgRetrunGroup retGroup) {
     lgData.GetDispStatics();
-    lgData.GetResult(retGroup);
+    lgData.GetResult(retGroup);//modified by jia 
     lgData.GetPackStatics();
 }
 
@@ -639,29 +654,6 @@ bool Legalizer::RunAll(lgSiteOrder siteOrder, lgGroupOrder groupOrder) {
                 if (MergeGroupToSite(curSite, group, false)) {
                     isPlaced = true;
                     lgData.PartialUpdate(group, curSite);
-
-                    double disp = abs((int)group.x - (int)lgData.groupsX[group.id])  +
-                                  abs((int)group.y - (int)lgData.groupsY[group.id]);
-                    //delete by jia because no clock region!!!
-                    // if (disp != 0 && database.crmap_nx != 0) {
-                    //     int len = ChainMove(group, DISP_OPT);
-                    //     if (len != -1) {
-                    //         nSucc++;
-                    //         chainLen += len;
-                    //     }
-                    //     nChain++;
-                    // }
-
-                    // disp = abs((int)group.x - (int)lgData.groupsX[group.id]) +
-                    //        abs((int)group.y - (int)lgData.groupsY[group.id]);
-                    // if (disp >= 2 && database.crmap_nx != 0) {
-                    //     int len = ChainMove(group, MAX_DISP_OPT);
-                    //     if (len != -1) {
-                    //         nSucc++;
-                    //         chainLen += len;
-                    //     }
-                    //     nChain++;
-                    // }
                 }
             }
         }
@@ -681,7 +673,7 @@ bool Legalizer::RunAll(lgSiteOrder siteOrder, lgGroupOrder groupOrder) {
 
 bool Legalizer::RunAll( lgSiteOrder siteOrder, 
                         lgGroupOrder groupOrder,
-                        t_packer_opts& packer_opts,////these two are member of vpr_setup
+                        t_packer_opts& packer_opts,//these two are member of vpr_setup
                         std::vector<t_lb_type_rr_node>* lb_type_rr_graphs,//these two are member of vpr_setup
                         std::multimap<AtomBlockId, t_pack_molecule*>& atom_molecules,
                         t_pb_graph_node** primitives_list,
@@ -783,8 +775,8 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
                                 //is_clock,timing_info,
                                 ext_pin_util_targets,
                                 //intra_lb_routing,
-                                clb_inter_blk_nets,logic_block_type,
-                                le_pb_type,le_count,num_clb,primitive_candidate_block_types,
+                                //logic_block_type,
+                                num_clb,primitive_candidate_block_types,
                                 balance_block_type_utilization,cluster_placement_stats)){
                     isPlaced=false;
                 }
@@ -845,53 +837,40 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
             for(int i=0;i< database.subtile_capacity[database.getSite(x,y)->type] ; i++){
                 VPR_CLB* clb=&lgData.clbMap[x][y][i];
                 if(clb!=nullptr && clb->valid){
-                    t_mode_selection_status mode_status;
-                    is_cluster_legal = try_intra_lb_route(clb->router_data, packer_opts.pack_verbosity, &mode_status);
-                    if (is_cluster_legal) { 
-                        intra_lb_routing.push_back(clb->router_data->saved_lb_nets);
-                        //VTR_ASSERT((int)intra_lb_routing.size() == num_clb);
-                        // if((int)intra_lb_routing.size() != num_clb){
-                        //     printlog(LOG_ERROR, "intra_lb_routing.size() != num_clb");
-                        // }
-                        clb->router_data->saved_lb_nets = nullptr;
+                    intra_lb_routing.push_back(clb->router_data->saved_lb_nets);
+                    //VTR_ASSERT((int)intra_lb_routing.size() == num_clb);
+                    // if((int)intra_lb_routing.size() != num_clb){
+                    //     printlog(LOG_ERROR, "intra_lb_routing.size() != num_clb");
+                    // }
+                    clb->router_data->saved_lb_nets = nullptr;
 
-                        //Pick a new seed
-                        //istart = get_highest_gain_seed_molecule(&seedindex, atom_molecules, seed_atoms);
+                    //Pick a new seed
+                    //istart = get_highest_gain_seed_molecule(&seedindex, atom_molecules, seed_atoms);
 
-                        // if (packer_opts.timing_driven) {
-                        //     if (num_blocks_hill_added > 0) {
-                        //         blocks_since_last_analysis += num_blocks_hill_added;
-                        //     }
-                        // }
+                    // if (packer_opts.timing_driven) {
+                    //     if (num_blocks_hill_added > 0) {
+                    //         blocks_since_last_analysis += num_blocks_hill_added;
+                    //     }
+                    // }
 
-                        /* store info that will be used later in packing from pb_stats and free the rest */
-                        t_pb_stats* pb_stats = cluster_ctx.clb_nlist.block_pb(clb->index)->pb_stats;
-                        for (const AtomNetId mnet_id : pb_stats->marked_nets) {
-                            int external_terminals = atom_ctx.nlist.net_pins(mnet_id).size() - pb_stats->num_pins_of_net_in_pb[mnet_id];
-                            /* Check if external terminals of net is within the fanout limit and that there exists external terminals */
-                            if (external_terminals < packer_opts.transitive_fanout_threshold && external_terminals > 0) {
-                                clb_inter_blk_nets[clb->index].push_back(mnet_id);
-                            }
+                    /* store info that will be used later in packing from pb_stats and free the rest */
+                    t_pb_stats* pb_stats = cluster_ctx.clb_nlist.block_pb(clb->index)->pb_stats;
+                    for (const AtomNetId mnet_id : pb_stats->marked_nets) {
+                        int external_terminals = atom_ctx.nlist.net_pins(mnet_id).size() - pb_stats->num_pins_of_net_in_pb[mnet_id];
+                        /* Check if external terminals of net is within the fanout limit and that there exists external terminals */
+                        if (external_terminals < packer_opts.transitive_fanout_threshold && external_terminals > 0) {
+                            clb_inter_blk_nets[clb->index].push_back(mnet_id);
                         }
-                        auto cur_pb = cluster_ctx.clb_nlist.block_pb(clb->index);
-
-                        // update the data structure holding the LE counts
-                        update_le_count(cur_pb, logic_block_type, le_pb_type, le_count);
-
-                        //print clustering progress incrementally
-                        //print_pack_status(num_clb, num_molecules, num_molecules_processed, mols_since_last_print, device_ctx.grid.width(), device_ctx.grid.height());
-
-                        free_pb_stats_recursive(cur_pb);
-                    } else {
-                        /* Free up data structures and requeue used molecules */
-                        num_used_type_instances[cluster_ctx.clb_nlist.block_type(clb->index)]--;
-                        revalid_molecules(cluster_ctx.clb_nlist.block_pb(clb->index), atom_molecules);
-                        cluster_ctx.clb_nlist.remove_block(clb->index);
-                        cluster_ctx.clb_nlist.compress();
-                        num_clb--;
-                        //seedindex = savedseedindex;
-                        abort();
                     }
+                    auto cur_pb = cluster_ctx.clb_nlist.block_pb(clb->index);
+
+                    // update the data structure holding the LE counts
+                    update_le_count(cur_pb, logic_block_type, le_pb_type, le_count);
+
+                    //print clustering progress incrementally
+                    //print_pack_status(num_clb, num_molecules, num_molecules_processed, mols_since_last_print, device_ctx.grid.width(), device_ctx.grid.height());
+
+                    free_pb_stats_recursive(cur_pb);
                 }
                 //free_router_data(router_data);
                 //router_data = nullptr;//? necessary?

@@ -52,4 +52,13 @@ public:
     void addPin(Pin *pin);
 };
 
+class ClbNet{
+public:
+    ClbNet(const string &name);
+    std::string name;
+    std::vector<Site* > sites;
+    void addsite(Site* site);
+};
+
+
 }  // namespace db

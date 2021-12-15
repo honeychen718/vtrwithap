@@ -27,6 +27,8 @@
 #include "read_xml_arch_file.h"
 #include "vpr_utils.h"
 #include "pack.h"
+//for debug
+// #include "DebugNew.h"
 
 #define LINELENGTH 1024
 #define TAB_LENGTH 4
@@ -568,6 +570,7 @@ void output_clustering(const vtr::vector<ClusterBlockId, std::vector<t_intra_lb_
             cluster_ctx.clb_nlist.block_pb(blk_id)->pb_route = alloc_and_load_pb_route(intra_lb_routing[blk_id], cluster_ctx.clb_nlist.block_pb(blk_id)->pb_graph_node);
         }
     }
+    db::database.writeclbnets();
 
     IntraLbPbPinLookup pb_graph_pin_lookup_from_index_by_type(device_ctx.logical_block_types);
 

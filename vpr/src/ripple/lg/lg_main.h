@@ -31,9 +31,9 @@ private:
                             //std::shared_ptr<SetupTimingInfo>& timing_info,
                             const t_ext_pin_util_targets& ext_pin_util_targets,
                             //vtr::vector<ClusterBlockId, std::vector<t_intra_lb_net>*>& intra_lb_routing,
-                            vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
-                            t_logical_block_type_ptr& logic_block_type,t_pb_type* le_pb_type,
-                            std::vector<int>& le_count,int& num_clb,
+                            //vtr::vector<ClusterBlockId, std::vector<AtomNetId>>& clb_inter_blk_nets,
+                            //t_pb_type* le_pb_type,
+                            int& num_clb,
                             const std::map<const t_model*, std::vector<t_logical_block_type_ptr>>& primitive_candidate_block_types,
                             bool balance_block_type_utilization,
                             t_cluster_placement_stats* cluster_placement_stats);

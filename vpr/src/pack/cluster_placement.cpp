@@ -25,6 +25,8 @@
 #include "vpr_utils.h"
 #include "hash.h"
 #include "cluster_placement.h"
+//for debug
+// #include "DebugNew.h"
 
 /****************************************/
 /*Local Function Declaration			*/

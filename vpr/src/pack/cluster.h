@@ -12,6 +12,14 @@
 #include "vpr_types.h"
 #include "timing_info.h"
 
+/* Keeps a linked list of the unclustered blocks to speed up looking for *
+ * unclustered blocks with a certain number of *external* inputs.        *
+ * [0..lut_size].  Unclustered_list_head[i] points to the head of the    *
+ * list of blocks with i inputs to be hooked up via external interconnect. */
+struct t_molecule_link;
+extern t_molecule_link* unclustered_list_head;
+extern t_molecule_link* memory_pool; /*Declared here so I can free easily.*/
+
 std::map<t_logical_block_type_ptr, size_t> do_clustering(const t_packer_opts& packer_opts,
                                                          const t_analysis_opts& analysis_opts,
                                                          const t_arch* arch,
@@ -94,5 +102,10 @@ std::map<const t_model*, std::vector<t_logical_block_type_ptr>> identify_primiti
 void free_pb_stats_recursive(t_pb* pb);
 
 void check_clustering();
+
+void print_le_count(std::vector<int>& le_count, const t_pb_type* le_pb_type);
+
+void echo_clusters(char* filename);
+
 
 #endif

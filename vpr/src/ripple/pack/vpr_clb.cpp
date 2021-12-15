@@ -1,4 +1,6 @@
 #include "vpr_clb.h"
+//for debug
+// #include "DebugNew.h"
 void VPR_CLB::read_cluster_placement_stats_from_clb( int type_index,t_cluster_placement_stats* cluster_placement_stats_ptr){
     int t , m;
     t_cluster_placement_primitive *cur , *prev;
@@ -86,7 +88,7 @@ void VPR_CLB::write_cluster_placement_stats_to_clb(t_cluster_placement_stats* cl
 }
 
 bool VPR_CLB::vpr_start_new_cluster(const Group& group){
-    ClusterBlockId clb_index=(ClusterBlockId)database.num_clb;
+    ClusterBlockId clb_index=(ClusterBlockId)packdata->num_clb;
     t_pack_molecule* molecule=group.vpr_molecule;
     t_packer_opts &packer_opts = database.vpr_setup->PackerOpts;
     std::vector<t_lb_type_rr_node>* lb_type_rr_graphs=database.vpr_setup->PackerRRGraph;
@@ -105,8 +107,8 @@ bool VPR_CLB::vpr_start_new_cluster(const Group& group){
     const std::string& root_atom_name = atom_ctx.nlist.block_name(root_atom);
     const t_model* root_model = atom_ctx.nlist.block_model(root_atom);
     
-    auto itr = database.primitive_candidate_block_types.find(root_model);
-    VTR_ASSERT(itr != database.primitive_candidate_block_types.end());
+    auto itr = packdata->primitive_candidate_block_types.find(root_model);
+    VTR_ASSERT(itr != packdata->primitive_candidate_block_types.end());
     //std::vector<t_logical_block_type_ptr> candidate_types = itr->second;
     this->block_types = itr->second;
 
@@ -125,8 +127,8 @@ bool VPR_CLB::vpr_start_new_cluster(const Group& group){
                              for (auto type : rhs->equivalent_tiles)
                                  rhs_num_instances += device_ctx.grid.num_instances(type);
 
-                             float lhs_util = vtr::safe_ratio<float>(database.num_used_type_instances[lhs], lhs_num_instances);
-                             float rhs_util = vtr::safe_ratio<float>(database.num_used_type_instances[rhs], rhs_num_instances);
+                             float lhs_util = vtr::safe_ratio<float>(packdata->num_used_type_instances[lhs], lhs_num_instances);
+                             float rhs_util = vtr::safe_ratio<float>(packdata->num_used_type_instances[rhs], rhs_num_instances);
                              //Lower util first
                              return lhs_util < rhs_util;
                          });
@@ -151,7 +153,7 @@ bool VPR_CLB::vpr_start_new_cluster(const Group& group){
         alloc_and_load_pb_stats(pb, packer_opts.feasible_block_array_size);
         pb->parent_pb = nullptr;
         this->router_data=alloc_and_load_router_data(&lb_type_rr_graphs[type->index], type);
-        cluster_placement_stats_ptr=&database.cluster_placement_stats[type->index];
+        cluster_placement_stats_ptr=&packdata->cluster_placement_stats[type->index];
         e_block_pack_status pack_result = BLK_STATUS_UNDEFINED;
         read_cluster_placement_stats_from_clb(type->index,cluster_placement_stats_ptr);
         for (int j = 0; j < type->pb_graph_head->pb_type->num_modes && !success; j++) {
@@ -170,8 +172,8 @@ bool VPR_CLB::vpr_start_new_cluster(const Group& group){
             //*********************************************************
             pack_result = try_pack_molecule(cluster_placement_stats_ptr,
                                 database.atom_molecules,
-                                molecule, database.primitives_list, pb,
-                                database.num_models, database.max_cluster_size, clb_index,
+                                molecule, packdata->primitives_list, pb,
+                                database.num_models,0, clb_index,
                                 1,//detailed_routing_stage, set to 1 for now
                                 this->router_data,
                                 packer_opts.pack_verbosity,
@@ -188,6 +190,7 @@ bool VPR_CLB::vpr_start_new_cluster(const Group& group){
             }
             pb->name = vtr::strdup(root_atom_name.c_str());
             clb_index =clb_nlist->create_block(root_atom_name.c_str(), pb, type);
+            database.clusterblockid_site[clb_index]=this->site;
             for(auto &pair:this->type_index_to_cluster_placement_stats){
                 if(pair.first != type->index){
                     this->type_index_to_cluster_placement_stats.erase(pair.first);
@@ -209,7 +212,7 @@ bool VPR_CLB::vpr_start_new_cluster(const Group& group){
     }
     //Successfully create cluster
     auto block_type = clb_nlist->block_type(clb_index);
-    database.num_used_type_instances[block_type]++;
+    packdata->num_used_type_instances[block_type]++;
 
     /* Expand FPGA size if needed */
     // Check used type instances against the possible equivalent physical locations
@@ -218,7 +221,7 @@ bool VPR_CLB::vpr_start_new_cluster(const Group& group){
         num_instances += device_ctx.grid.num_instances(equivalent_tile);
     }
 
-    if (database.num_used_type_instances[block_type] > num_instances) {
+    if (packdata->num_used_type_instances[block_type] > num_instances) {
         //to be un//ed
         //device_ctx.grid = create_device_grid(device_layout_name, arch->grid_layouts, num_used_type_instances, target_device_utilization);
         printlog(LOG_INFO, "device to be expanded");
@@ -237,26 +240,25 @@ bool VPR_CLB::AddInsts(const Group& group){
     t_packer_opts &packer_opts = database.vpr_setup->PackerOpts;
     
     if(!this->valid){
-        success=vpr_start_new_cluster(group);
-        if(success){
-            //router_data=nullptr;
+        if(vpr_start_new_cluster(group)){
             this->valid=true;
-            this->index=(ClusterBlockId)database.num_clb;
-            database.num_clb++;
+            this->index=(ClusterBlockId)packdata->num_clb;
+            packdata->num_clb++;
+            success=true;
         }
     }else{
         int type_index;
         type_index=cluster_ctx.clb_nlist.block_type(this->index)->index;
-        cur_cluster_placement_stats_ptr = &database.cluster_placement_stats[type_index];
+        cur_cluster_placement_stats_ptr = &packdata->cluster_placement_stats[type_index];
         target_ext_pin_util = database.target_external_pin_util.get_pin_util(cluster_ctx.clb_nlist.block_type(this->index)->name);
         read_cluster_placement_stats_from_clb(type_index,cur_cluster_placement_stats_ptr);
         block_pack_status = try_pack_molecule(cur_cluster_placement_stats_ptr,
                                         database.atom_molecules,
                                         group.vpr_molecule,
-                                        database.primitives_list,
+                                        packdata->primitives_list,
                                         cluster_ctx.clb_nlist.block_pb(this->index),
                                         database.num_models,
-                                        database.max_cluster_size,
+                                        0,
                                         this->index,
                                         1,//detailed_routing_stage set to 1
                                         this->router_data,
@@ -269,7 +271,7 @@ bool VPR_CLB::AddInsts(const Group& group){
     }
 
     if(success){
-        write_cluster_placement_stats_to_clb(database.cluster_placement_stats);
+        write_cluster_placement_stats_to_clb(packdata->cluster_placement_stats);
         
         int high_fanout_threshold = database.high_fanout_thresholds.get_threshold(cluster_ctx.clb_nlist.block_type(this->index)->name);
                     
@@ -280,7 +282,12 @@ bool VPR_CLB::AddInsts(const Group& group){
             packer_opts.alpha, packer_opts.beta,
             packer_opts.timing_driven, packer_opts.connection_driven,
             high_fanout_threshold,
-            *database.timing_info);
+            *packdata->timing_info);
+
+        //for ripple
+        for(Instance* inst:group.instances){
+            instances.push_back(inst);
+        }
         return true;
     }
 
@@ -288,18 +295,19 @@ bool VPR_CLB::AddInsts(const Group& group){
 }
 
 VPR_CLB::VPR_CLB(){
-    valid=false;
-    is_full=false;
 }
 
 VPR_CLB::~VPR_CLB(){
     //delete pb;
-    delete router_data;
-    cout<<"this clb "<<"deconstructed"<<endl;
+    // free_router_data(router_data);
 }
 
 void VPR_CLB::GetResult(Group& group){
     for(Instance* inst:instances){
         group.instances.push_back(inst);
     }
+}
+
+bool VPR_CLB::IsEmpty(){
+    return instances.empty();
 }
