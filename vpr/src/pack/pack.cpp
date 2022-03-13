@@ -149,7 +149,7 @@ bool try_pack(t_packer_opts* packer_opts,
         bool fits_on_device = try_size_device_grid(*arch, num_type_instances, packer_opts->target_device_utilization, packer_opts->device_layout);
 
         if (fits_on_device) {
-            break; //Done
+            //break; //Done
         } else if (pack_iteration == 1) {
             //1st pack attempt was unsucessful (i.e. not dense enough) and we have control of unrelated clustering
             //

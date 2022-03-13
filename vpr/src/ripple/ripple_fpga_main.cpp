@@ -32,7 +32,8 @@ bool ripple_fpga_main(t_vpr_setup* vpr_setup_in,t_arch* arch) {
 
     database.vpr_setup=vpr_setup_in;
     database.arch=arch;
-    database.readArch();
+    //database.readArch();
+    database.read_from_vpr_database();
 
     database.setup();
     database.print();
@@ -79,7 +80,7 @@ bool ripple_fpga_main(t_vpr_setup* vpr_setup_in,t_arch* arch) {
     gplace(groups);
     if (database.crmap_nx == 0) {
         gpSetting.set2c();
-        gp_cong(groups, 3);
+        gp_cong(groups, 1);//change 3 to 1
     }
     legalize_partial(groups);
     gpSetting.set3();
@@ -92,9 +93,9 @@ bool ripple_fpga_main(t_vpr_setup* vpr_setup_in,t_arch* arch) {
         legalize(groups, SITE_HPWL, UPDATE_XY_ORDER);
     else
         legalize(groups, SITE_HPWL_SMALL_WIN, UPDATE_XY_ORDER);
-    dplace(groups);
+    dplace(groups,1);//change 10(default) to 1
 
-    database.writePl(setting.io_out);
+    //database.writePl(setting.io_out);
 
     printlog(LOG_INFO, "hpwl = %.1lf", database.getHPWL(true));
     printlog(LOG_INFO, "#net = %d / %d", database.getRouteNet(), database.nets.size());

@@ -13,6 +13,8 @@ enum lgRetrunGroup { GET_SLICE, UPDATE_XY, UPDATE_XY_ORDER, NO_UPDATE };
 
 enum lgPackMethod { USE_CLB1, USE_CLB2 ,USE_VPR_CLB};
 
+enum lgGetResultMethod {GET_ALL , GET_PARTIAL};
+
 void planning(vector<Group> &groups);
 void legalize(vector<Group> &groups, lgSiteOrder siteOrder, lgRetrunGroup retGroup);
 void legalize_partial(vector<Group> &groups);

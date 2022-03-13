@@ -3,6 +3,9 @@
 #include "gp_setting.h"
 using namespace db;
 
+void bilf_models_in_pb_type(const t_pb_type* pb_type, map<string, int>& blif_models_and_num);
+bool pb_type_contains_blif_model(const t_pb_type* pb_type, const std::string& blif_model_name, int& capacity);
+
 bool read_line_as_tokens(istream& is, vector<string>& tokens) {
     tokens.clear();
     string line;
@@ -90,6 +93,35 @@ bool Database::readAux(string file) {
     return true;
 }
 
+bool Database::alloc_and_load_Instances(){
+    auto& atom_ctx = g_vpr_ctx.atom();
+    auto blocks = atom_ctx.nlist.blocks();
+    for (auto blk_iter = blocks.begin(); blk_iter != blocks.end(); ++blk_iter) {
+        auto blk_id = *blk_iter;
+        auto model = atom_ctx.nlist.block_model(blk_id);
+        string block_name = atom_ctx.nlist.block_name(blk_id);
+        Instance* instance = database.getInstance(block_name);
+        if (instance != NULL) {
+            printlog(LOG_ERROR, "Instance duplicated: %s", block_name.c_str());
+        } else {
+            Master* master = NULL;
+            if((string)model->name == ".names"){
+                int num_input_pins = atom_ctx.nlist.block_input_pins(blk_id).size();
+                master = database.getMaster(model , num_input_pins);
+            }else{
+                master = database.getMaster(model);
+            }
+            
+            if (master == NULL) {
+                printlog(LOG_ERROR, "Master not found: %s", model->name);
+            } else {
+                Instance newinstance(block_name, master ,blk_id);
+                instance = database.addInstance(newinstance);
+            }
+        }
+    }
+}
+
 bool Database::readNodes(string file) {
     ifstream fs(file);
     if (!fs.good()) {
@@ -115,6 +147,49 @@ bool Database::readNodes(string file) {
 
     fs.close();
     return true;
+}
+
+bool Database::alloc_and_load_Nets(){
+    auto& atom_ctx = g_vpr_ctx.atom();
+    auto nets = atom_ctx.nlist.nets();
+    Net* net = NULL;
+    for (auto net_iter = nets.begin(); net_iter != nets.end(); ++net_iter) {
+        string net_name = atom_ctx.nlist.net_name(*net_iter);
+        //cout<<"net:\t"<<net_name<<endl;
+        net = database.getNet(net_name);
+        if (net != NULL) {
+            printlog(LOG_ERROR, "Net duplicated: %s", net_name.c_str());
+        } else {
+            Net newnet(net_name);
+            net = database.addNet(newnet);
+        }
+        auto net_pins = atom_ctx.nlist.net_pins(*net_iter);
+        for (auto pin_iter = net_pins.begin(); pin_iter != net_pins.end(); ++pin_iter) {
+            auto pin_block = atom_ctx.nlist.pin_block(*pin_iter);
+            auto model = atom_ctx.nlist.block_model(pin_block);
+            string block_name = atom_ctx.nlist.block_name(pin_block);
+            string pin_full_name = atom_ctx.nlist.pin_name(*pin_iter);
+            size_t dot_pos = pin_full_name.find_last_of(".");
+            string pin_name = pin_full_name.substr(dot_pos + 1);
+            Instance* instance = database.getInstance(block_name.c_str());
+            Pin* pin = NULL;
+            if (instance != NULL) {
+                pin = instance->getPin(pin_name);
+            } else {
+                printlog(LOG_ERROR, "Instance not found: %s", pin_name.c_str());
+            }
+            if (pin == NULL) {
+                printlog(LOG_ERROR, "Pin not found: %s", pin_name.c_str());
+            } else {
+                net->addPin(pin);
+                if (pin->type->type == 'o' && pin->instance->master->name == Master::BUFGCE) {
+                    net->isClk = true;
+                }
+            }
+            //cout<<block_name<<"\t"<<atom_ctx.nlist.pin_name(*pin_iter)<<endl;
+        }
+        //cout<<"\n"<<endl;
+    }
 }
 
 bool Database::readNets(string file) {
@@ -165,6 +240,29 @@ bool Database::readNets(string file) {
     return false;
 }
 
+bool Database::alloc_and_load_Sites(){
+    auto& device_ctx = g_vpr_ctx.mutable_device();
+    device_ctx.grid = create_device_grid("ripple", database.arch->grid_layouts);
+    //auto &grid=device_ctx.grid;
+    //cout<<device_ctx.grid.width()<<"\t"<<device_ctx.grid.height()<<"\t"<<endl;
+    int nx = device_ctx.grid.width();
+    int ny = device_ctx.grid.height();
+    database.setSiteMap(nx, ny);
+    database.setSwitchBoxes(nx - 1, ny - 1);
+    for (int x = 0; x < nx; x++) {
+        for (int y = 0; y < ny; y++) {
+            //cout<<i<<"\t"<<j<<"\t"<<device_ctx.grid[i][j].type->name<<endl;
+            string site_name = device_ctx.grid[x][y].type->name;
+            SiteType* sitetype = database.getSiteType(SiteType::NameString2Enum(site_name));
+            if (sitetype == NULL) {
+                printlog(LOG_ERROR, "Site type not found: %s", site_name.c_str());
+            } else {
+                database.addSite(x, y, sitetype);
+            }
+        }
+    }
+}
+
 bool Database::readPl(string file) {
     ifstream fs(file);
     if (!fs.good()) {
@@ -187,10 +285,127 @@ bool Database::readPl(string file) {
             slot += 16;
         else if (instance->IsCARRY())
             slot += 32;
-        place(instance, x, y, slot);
+        place(instance, x, y);
     }
     fs.close();
     return true;
+}
+
+bool Database::alloc_and_load_Resources(){
+    primitive_candidate_block_types = identify_primitive_candidate_block_types();
+    auto& device_ctx = g_vpr_ctx.mutable_device();
+    for (auto const& tile : device_ctx.physical_tile_types) {
+        const t_physical_tile_type* physical_tile = &tile;
+        SiteType* sitetype = database.getSiteType(physical_tile);
+        if (sitetype == NULL) {
+            SiteType* newsitetype = new SiteType(physical_tile);
+            sitetypes.push_back(newsitetype);
+        } else {
+            printlog(LOG_WARN, "Duplicated site type: %s", sitetype->name);
+        }
+
+        //write dsp&ram area in GPsetting
+        if (sitetype->name == SiteType::DSP) {
+            gpSetting.dspArea = tile.height * tile.width;
+        }
+
+        if (sitetype->name == SiteType::BRAM) {
+            gpSetting.ramArea = tile.height * tile.width;
+        }
+        //
+        assert(tile.sub_tiles.size()<=1);
+        for (auto const& sub_tile : tile.sub_tiles) {
+            int const sub_tile_capacity = sub_tile.capacity.total();
+            database.subtile_capacity[sitetype]=sub_tile_capacity;
+            for (auto const& pb_type : sub_tile.equivalent_sites) {
+                //cout<<equivalent_site->name<<endl;
+                t_model* cur_model = vpr_setup->user_models;
+                while (cur_model) {
+                    int capacity = 1;
+                    //string model_name=cur_model->name;
+                    if (pb_type_contains_blif_model(pb_type->pb_type, cur_model->name, capacity)) {
+                        capacity *= sub_tile_capacity;
+                        string resource_name = cur_model->name;
+                        Resource* resource = database.getResource(Resource::NameString2Enum(resource_name));
+                        if (resource == NULL) {
+                            Resource newresource(Resource::NameString2Enum(resource_name));
+                            resource = database.addResource(newresource);
+                        }
+                        sitetype->addResource(resource, capacity);
+                        Master* master = database.getMaster(cur_model);
+                        if (master == NULL) {
+                            printlog(LOG_ERROR, "Master not found: %s", cur_model->name);
+                        } else {
+                            resource->addMaster(master);
+                        }
+                    }
+                    cur_model = cur_model->next;
+                }
+                cur_model = vpr_setup->library_models;
+                bool has_io_resource_added = false;
+                while (cur_model) {
+                    int capacity = 1;
+                    //string model_name=cur_model->name;
+                    string model_name = cur_model->name;
+                    if (pb_type_contains_blif_model(pb_type->pb_type, cur_model->name, capacity)) {
+                        capacity *= sub_tile_capacity;
+                        if (model_name == ".input" || model_name == ".output") {
+                            Resource* resource = database.getResource(Resource::NameString2Enum("IO"));
+                            if (resource == NULL) {
+                                Resource newresource(Resource::NameString2Enum("IO"));
+                                resource = database.addResource(newresource);
+                            }
+                            if (!has_io_resource_added) {
+                                sitetype->addResource(resource, capacity);
+                                has_io_resource_added = true;
+                            }
+                            Master* master = database.getMaster(cur_model);
+                            if (master == NULL) {
+                                printlog(LOG_ERROR, "Master not found: %s", cur_model->name);
+                            } else {
+                                resource->addMaster(master);
+                            }
+                        } else if (model_name == ".names") {
+                            Resource* resource = database.getResource(Resource::NameString2Enum("LUT"));
+                            if (resource == NULL) {
+                                Resource newresource(Resource::NameString2Enum("LUT"));
+                                resource = database.addResource(newresource);
+                            }
+                            sitetype->addResource(resource, capacity);
+                            for (int i = 6; i > 0; i--) {
+                                string lut_name = "LUT" + to_string(i);
+                                Master* master = database.getMaster(Master::NameString2Enum(lut_name));
+                                if (master == NULL) {
+                                    printlog(LOG_ERROR, "Master not found: %s", cur_model->name);
+                                } else {
+                                    resource->addMaster(master);
+                                }
+                            }
+                            //write lutPerSlice in gpsettings
+                            lutPerSlice = capacity * 0.75;
+
+                        } else if (model_name == ".latch") {
+                            Resource* resource = database.getResource(Resource::NameString2Enum("FF"));
+                            if (resource == NULL) {
+                                Resource newresource(Resource::NameString2Enum("FF"));
+                                resource = database.addResource(newresource);
+                            }
+                            sitetype->addResource(resource, capacity);
+                            Master* master = database.getMaster(Master::NameString2Enum(cur_model->name));
+                            if (master == NULL) {
+                                printlog(LOG_ERROR, "Master not found: %s", cur_model->name);
+                            } else {
+                                resource->addMaster(master);
+                            }
+                            ffPerSlice = capacity * 0.75;
+                        }
+                    }
+                    cur_model = cur_model->next;
+                }
+            }
+        }
+    }
+
 }
 
 bool Database::readScl(string file) {
@@ -287,6 +502,49 @@ bool Database::readScl(string file) {
     return true;
 }
 
+bool Database::alloc_and_load_Masters(){
+    Master* master = NULL;
+    const t_model* cur_model;
+    cur_model = vpr_setup->user_models;
+    while (cur_model) {
+        master = database.getMaster(cur_model);
+        if (master == NULL) {
+            Master* master= new Master(cur_model);
+            masters.push_back(master);
+        } else {
+            printlog(LOG_WARN, "Duplicated master: %s",cur_model->name);
+        }
+        cur_model = cur_model->next;
+    }
+
+    cur_model = vpr_setup->library_models;
+    while (cur_model) {
+        string cur_model_name = cur_model->name;
+        if (cur_model_name == ".names") {
+            //////alloc_and_add_lut_Masters();
+            for (int i = 6; i > 0; i--) {
+                master = database.getMaster(cur_model , i);
+                if (master == NULL) {
+                    Master* newmaster = new Master(cur_model , i);
+                    masters.push_back(newmaster);
+                } else {
+                    printlog(LOG_WARN, "Duplicated master: %s", cur_model_name.c_str());
+                }
+            }
+            cur_model = cur_model->next;
+            continue;
+        }
+        master = database.getMaster(cur_model);
+        if (master == NULL) {
+            Master* master= new Master(cur_model);
+            masters.push_back(master);
+        } else {
+            printlog(LOG_WARN, "Duplicated master: %s", cur_model_name.c_str());
+        }
+        cur_model = cur_model->next;
+    }
+}
+
 bool Database::readLib(string file) {
     ifstream fs(file);
     if (!fs.good()) {
@@ -338,39 +596,47 @@ bool Database::readWts(string file) {
 }
 
 bool Database::writePl(string file) {
-    ofstream fs(file);
-    if (!fs.good()) {
-        printlog(LOG_ERROR, "Cannot open %s to write", file.c_str());
-        return false;
-    }
+    // ofstream fs(file);
+    // if (!fs.good()) {
+    //     printlog(LOG_ERROR, "Cannot open %s to write", file.c_str());
+    //     return false;
+    // }
 
-    vector<Instance*>::iterator ii = database.instances.begin();
-    vector<Instance*>::iterator ie = database.instances.end();
-    int nErrorLimit = 10;
-    for (; ii != ie; ++ii) {
-        Instance* instance = *ii;
-        if (instance->pack == NULL || instance->pack->site == NULL) {
-            if (nErrorLimit > 0) {
-                printlog(LOG_ERROR, "Instance not placed: %s", instance->name.c_str());
-                nErrorLimit--;
-            } else if (nErrorLimit == 0) {
-                printlog(LOG_ERROR, "(Remaining same errors are not shown)");
-                nErrorLimit--;
-            }
-            continue;
-        }
-        Site* site = instance->pack->site;
-        int slot = instance->slot;
-        if (instance->IsFF())
-            slot -= 16;
-        else if (instance->IsCARRY())
-            slot -= 32;
-        fs << instance->name << " " << site->x << " " << site->y << " " << slot;
-        if (instance->inputFixed) fs << " FIXED";
-        fs << endl;
-    }
+    // vector<Instance*>::iterator ii = database.instances.begin();
+    // vector<Instance*>::iterator ie = database.instances.end();
+    // int nErrorLimit = 10;
+    // for (; ii != ie; ++ii) {
+    //     Instance* instance = *ii;
+    //     if (instance->pack == NULL || instance->pack->site == NULL) {
+    //         if (nErrorLimit > 0) {
+    //             printlog(LOG_ERROR, "Instance not placed: %s", instance->name.c_str());
+    //             nErrorLimit--;
+    //         } else if (nErrorLimit == 0) {
+    //             printlog(LOG_ERROR, "(Remaining same errors are not shown)");
+    //             nErrorLimit--;
+    //         }
+    //         continue;
+    //     }
+    //     Site* site = instance->pack->site;
+    //     int slot = instance->slot;
+    //     if (instance->IsFF())
+    //         slot -= 16;
+    //     else if (instance->IsCARRY())
+    //         slot -= 32;
+    //     fs << instance->name << " " << site->x << " " << site->y << " " << slot;
+    //     if (instance->inputFixed) fs << " FIXED";
+    //     fs << endl;
+    // }
 
     return true;
+}
+
+bool Database::read_from_vpr_database(){
+    alloc_and_load_Masters();
+    alloc_and_load_Instances();
+    alloc_and_load_Resources();
+    alloc_and_load_Sites();
+    alloc_and_load_Nets();
 }
 
 // vector<string> modelname_to_mastername(string modelname){

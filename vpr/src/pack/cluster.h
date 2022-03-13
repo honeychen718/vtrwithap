@@ -79,6 +79,9 @@ enum e_block_pack_status try_pack_molecule(t_cluster_placement_stats* cluster_pl
                                                   const int feasible_block_array_size,
                                                   t_ext_pin_util max_external_pin_util,
                                                   PartitionRegion& temp_cluster_pr);
+
+void revert_place_atom_block(const AtomBlockId blk_id, t_lb_router_data* router_data, const std::multimap<AtomBlockId, t_pack_molecule*>& atom_molecules);
+
 void update_cluster_stats(const t_pack_molecule* molecule,
                                  const ClusterBlockId clb_index,
                                  const std::unordered_set<AtomNetId>& is_clock,
@@ -107,5 +110,14 @@ void print_le_count(std::vector<int>& le_count, const t_pb_type* le_pb_type);
 
 void echo_clusters(char* filename);
 
+bool cleanup_pb(t_pb* pb);
+
+void reset_lookahead_pins_used(t_pb* cur_pb);
+
+void try_update_lookahead_pins_used(t_pb* cur_pb);
+
+bool check_lookahead_pins_used(t_pb* cur_pb, t_ext_pin_util max_external_pin_util);
+
+void update_molecule_chain_info(t_pack_molecule* chain_molecule, const t_pb_graph_node* root_primitive);
 
 #endif

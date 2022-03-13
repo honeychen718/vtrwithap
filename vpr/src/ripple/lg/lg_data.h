@@ -50,7 +50,7 @@ public:
 
     LGData(vector<Group> &_groups);
     void Init(lgPackMethod packMethod);
-    void GetResult(lgRetrunGroup retGroup);
+    void GetResult(lgRetrunGroup retGroup,lgGetResultMethod all_or_partial);
 
     // statistic variables
     int invokeCount;

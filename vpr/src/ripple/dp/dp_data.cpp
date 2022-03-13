@@ -7,12 +7,15 @@ extern bool legCLB1Succ;  // true;
 DPData::DPData(vector<Group>& _groups) : groups(_groups) {
     useCLB1 = legCLB1Succ;
 
+    packdata = new VPR_Pack_Data;
+    packdata->Init();
+
     // build clb map and group map
     clbMap.assign(database.sitemap_nx, vector<VPR_CLB*>(database.sitemap_ny, NULL));
     for (int x = 0; x < database.sitemap_nx; x++) {
         for (int y = 0; y < database.sitemap_ny; y++) {
             if (database.getSite(x, y)->type->name == SiteType::SLICE) {
-                clbMap[x][y] = NewCLB();
+                clbMap[x][y] = new VPR_CLB(packdata,database.getSite(x,y),0);
             }
         }
     }
@@ -22,7 +25,7 @@ DPData::DPData(vector<Group>& _groups) : groups(_groups) {
         int gy = groups[g].y;
         groupMap[gx][gy].push_back(groups[g].id);
         if (groups[g].IsBLE()) {
-            if (!clbMap[gx][gy]->AddInsts(groups[g])) assert(false);
+            if (!clbMap[gx][gy]->TryAddInsts(groups[g])) assert(false);
         }
     }
 

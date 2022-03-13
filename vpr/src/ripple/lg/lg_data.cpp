@@ -307,7 +307,7 @@ void LGData::UpdateGroupXYnOrder() {
         groupMap[group.x][group.y].push_back(group.id);
 }
 
-void LGData::GetResult(lgRetrunGroup retGroup) { 
+void LGData::GetResult(lgRetrunGroup retGroup,lgGetResultMethod all_or_partial) { 
     // transform clb to pack
     SiteType* siteslice = database.getSiteType(SiteType::NameString2Enum("SLICE"));
     int numresourceinslice = siteslice->resources.size();
@@ -338,23 +338,20 @@ void LGData::GetResult(lgRetrunGroup retGroup) {
         printlog(LOG_ERROR, "wrong usage in LGData::GetResult");
 
     // clean up //in do clustering while()
-    freeclbdata();
+    //freeclbdata();
+    packdata.intra_lb_routing.assign(packdata.num_clb,nullptr);    
+    for (int x = 0; x < database.sitemap_nx; x++) {
+        for (int y = 0; y < database.sitemap_ny; y++) {
+            delete[] clbMap[x][y];
+        }
+    }
+
     if (packdata.le_pb_type) {
         print_le_count(packdata.le_count, packdata.le_pb_type);
     }
 
     //in do clustering at the end of while
-    packdata.Free(VPR_Pack_Data::FREE_ALL_FOR_REPACK);
-    
-    for (int x = 0; x < database.sitemap_nx; x++) {
-        for (int y = 0; y < database.sitemap_ny; y++) {
-            for(int i = 0;i<database.subtile_capacity[database.getSite(x,y)->type];i++){
-                free_router_data(clbMap[x][y][i].router_data);
-                clbMap[x][y][i].router_data=nullptr;
-            }
-            delete[] clbMap[x][y];
-        }
-    }
+    packdata.Free(VPR_Pack_Data::FREE_ALL_FOR_REPACK, all_or_partial == GET_ALL);
 }
 
 void LGData::PartialUpdate(Group& group, Site* targetSite) {
@@ -388,10 +385,10 @@ void LGData::freeclbdata() {
         for (int y = 0; y < database.sitemap_ny; y++) {
             for (int i = 0; i < database.subtile_capacity[database.getSite(x, y)->type]; i++) {
                 VPR_CLB* clb = &clbMap[x][y][i];
-                if (clb != nullptr && clb->valid) {
+                if (clb != nullptr && clb->CLBIsEmpty) {
                     packdata.intra_lb_routing[clb->index]=clb->router_data->saved_lb_nets;
                     clb->router_data->saved_lb_nets = nullptr;
-                    t_pb_stats* pb_stats = cluster_ctx.clb_nlist.block_pb(clb->index)->pb_stats;
+                    //t_pb_stats* pb_stats = cluster_ctx.clb_nlist.block_pb(clb->index)->pb_stats;
 
                     auto cur_pb = cluster_ctx.clb_nlist.block_pb(clb->index);
 

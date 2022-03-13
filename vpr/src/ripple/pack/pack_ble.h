@@ -44,6 +44,9 @@ public:
     void PackSingFF();
 
     void GetResult(vector<Group>& groups) const;
+
+    //my function
+    bool Can_Pair_Luts();
 };
 
 #endif

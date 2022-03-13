@@ -27,7 +27,8 @@ private:
     unordered_map<string, Net*> name_nets;
 
     // instance
-    unordered_map<Master::Name, Master*, hash<int>> name_masters;
+    //unordered_map<Master::Name, Master*, hash<int>> name_masters;
+    //unordered_map<const t_model*, Master*> model_masters;//for vpr model
     unordered_map<string, Instance*> name_instances;
     unordered_map<AtomBlockId,Instance*> atom_instances; 
 
@@ -80,6 +81,7 @@ public:
     vector<Instance*> instances;
 
     // site
+    map<const t_model*, std::vector<t_logical_block_type_ptr>> primitive_candidate_block_types;
     map<SiteType* , int> subtile_capacity; //added by jia
     vector<Resource*> resources;
     vector<SiteType*> sitetypes;
@@ -150,7 +152,7 @@ public:
     double getSiteHPWL();
     double getSwitchBoxHPWL(bool printXY = false);
     int getRouteNet();
-    int getTotNumDupInputs();
+    //int getTotNumDupInputs();
 
     Master* addMaster(const Master& master);
     Instance* addInstance(const Instance& instance);
@@ -162,11 +164,13 @@ public:
     SwitchBox* addSwitchBox(int x, int y);
 
     Master* getMaster(Master::Name name);
+    Master* getMaster(const t_model* model , int lut_num_input_pins = -1);//for vpr model
     Instance* getInstance(const string& name);
     Instance* getInstance(const AtomBlockId & atom);
     Net* getNet(const string& name);
     Resource* getResource(Resource::Name name);
     SiteType* getSiteType(SiteType::Name name);
+    SiteType* getSiteType(const t_physical_tile_type_ptr tile_type);
     Site* getSite(int x, int y);
     SwitchBox* getSwitchBox(int x, int y);
 
@@ -180,6 +184,13 @@ public:
     bool readLib(string file);
     bool writePl(string file);
     bool readArch();
+    
+    bool read_from_vpr_database();
+    bool alloc_and_load_Masters();
+    bool alloc_and_load_Instances();
+    bool alloc_and_load_Resources();
+    bool alloc_and_load_Sites();
+    bool alloc_and_load_Nets();
 
     /***** Drawing (defined in db_draw.cpp *****/
     enum DrawType {

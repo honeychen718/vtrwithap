@@ -421,7 +421,7 @@ void CLB1::GetResult(Group& group) {
     // move single LUT to odd postion
     for (int i = 0; i < 8; i++) {
         if (insts[i * 2] != NULL && insts[i * 2 + 1] == NULL) {
-            insts[i * 2]->slot++;
+            //insts[i * 2]->slot++;
             insts[i * 2 + 1] = insts[i * 2];
             insts[i * 2] = NULL;
         }

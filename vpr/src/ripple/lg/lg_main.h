@@ -55,7 +55,7 @@ public:
 
     Legalizer(vector<Group> &_groups);
     void Init(lgPackMethod packMethod);
-    void GetResult(lgRetrunGroup retGroup);
+    void GetResult(lgRetrunGroup retGroup ,lgGetResultMethod all_or_partial=GET_ALL);
 
     bool RunAll(lgSiteOrder siteOrder, lgGroupOrder groupOrder);
     bool RunAll(lgSiteOrder siteOrder, lgGroupOrder groupOrder,

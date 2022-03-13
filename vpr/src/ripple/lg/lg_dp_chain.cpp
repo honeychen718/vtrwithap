@@ -6,7 +6,7 @@ ChainFinder::ChainFinder(vector<Group>& _groups) : groups(_groups) { checkColrgn
 
 void ChainFinder::Backtrack(int gid2Move) {
     inChain[gid2Move] = false;
-    delete (clbChain.back());
+    //delete (clbChain.back());
     gidChain.pop_back();
     clbChain.pop_back();
     orderChain.pop_back();
@@ -250,6 +250,7 @@ bool ChainFinder::DFS(DPBle& dpBle) {
     int gid2Move = gidChain.back();
 
     if (gidChain.size() > depth) {
+        dpBle.dpData.DeleteCLB(clbChain.back());
         Backtrack(gid2Move);
         return false;
     }
@@ -298,17 +299,23 @@ bool ChainFinder::DFS(DPBle& dpBle) {
         }
 
         VPR_CLB* tarClb = NULL;
+        // if (siteIndx == -1) {
+        //     if (clbMap[x][y] == NULL) {
+        //         clbMap[x][y] = new VPR_CLB;
+        //         for (auto gid : placedGroups) clbMap[x][y]->TryAddInsts(groups[gid]);
+        //     }
+        //     tarClb = clbMap[x][y];
+        // } else {
+        //     tarClb = clbChain[siteIndx];
+        // }
         if (siteIndx == -1) {
-            if (clbMap[x][y] == NULL) {
-                clbMap[x][y] = new VPR_CLB;
-                for (auto gid : placedGroups) clbMap[x][y]->AddInsts(groups[gid]);
-            }
-            tarClb = clbMap[x][y];
+            assert(dpBle.dpData.clbMap[x][y]);
+            tarClb = dpBle.dpData.clbMap[x][y];       
         } else {
             tarClb = clbChain[siteIndx];
         }
 
-        if (tarClb->AddInsts(groups[gid2Move])) {
+        if (tarClb->TryAddInsts(groups[gid2Move])) {
             vector<int> lgorder = placedGroups;
             lgorder.push_back(gid2Move);
 
@@ -355,6 +362,7 @@ bool ChainFinder::DFS(DPBle& dpBle) {
             if (inChain[gid2Sub]) continue;
 
             if (count++ > breadth) {
+                dpBle.dpData.DeleteCLB(clbChain.back());
                 Backtrack(gid2Move);
                 return false;
             }
@@ -369,22 +377,22 @@ bool ChainFinder::DFS(DPBle& dpBle) {
                     continue;
                 }
             }
-
-            VPR_CLB* subClb = new VPR_CLB;
+            VPR_CLB* subClb = dpBle.dpData.NewCLB(site); 
             vector<int> lgorder;
             bool canSub = true;
 
             for (auto gid : placedGroups) {
                 if (gid != gid2Sub) {
-                    if (!subClb->AddInsts(groups[gid])) {
+                    if (!subClb->TryAddInsts(groups[gid])) {
                         canSub = false;
+                        //assert(false);
                         break;
                     }
                     lgorder.push_back(gid);
                 }
             }
             if (canSub) {
-                canSub = subClb->AddInsts(groups[gid2Move]);
+                canSub = subClb->TryAddInsts(groups[gid2Move]);
                 lgorder.push_back(gid2Move);
             }
 
@@ -400,7 +408,10 @@ bool ChainFinder::DFS(DPBle& dpBle) {
                     return true;
                 }
             } else {
-                delete subClb;
+                // free_pb(subClb->pb);
+                // subClb->pb = NULL;
+                // delete subClb;
+                dpBle.dpData.DeleteCLB(subClb);
             }
 
             if (checkColrgn) {
@@ -411,6 +422,7 @@ bool ChainFinder::DFS(DPBle& dpBle) {
         }
     }
 
+    dpBle.dpData.DeleteCLB(clbChain.back());
     Backtrack(gid2Move);
     return false;
 }
@@ -430,7 +442,11 @@ void DPBle::ChainUpdate(vector<int>& path, vector<VPR_CLB*>& clbChain, vector<ve
         int tarX = (i == path.size() - 1) ? destX : groups[gid].x;
         int tarY = (i == path.size() - 1) ? destY : groups[gid].y;
         dpData.groupMap[tarX][tarY] = lgorderChain[i];
-        dpData.clbMap[tarX][tarY] = clbChain[i];
+        //dpData.clbMap[tarX][tarY] = clbChain[i];
+        if(i!=path.size() - 1){
+            //dpData.UpdateCLB(dpData.clbMap[tarX][tarY],clbChain[i]);
+            dpData.UpdateCLB(clbChain[i]);
+        }
     }
 
     for (unsigned i = 0; i < path.size() - 1; i++) {
@@ -447,13 +463,11 @@ void DPBle::ChainUpdate(vector<int>& path, vector<VPR_CLB*>& clbChain, vector<ve
     }
 }
 
-void ChainFinder::Init(Group& group, DPBle& dpBle) {
-    VPR_CLB* srcClb = new VPR_CLB;
+void ChainFinder::Init(Group &group, DPBle &dpBle, VPR_CLB*& srcClb){
     vector<int> lgorder;
 
     for (auto gid : dpBle.dpData.groupMap[groups[group.id].x][groups[group.id].y]) {
         if (gid != group.id) {
-            srcClb->AddInsts(groups[gid]);
             lgorder.push_back(gid);
         }
     }
@@ -467,7 +481,38 @@ void ChainFinder::Init(Group& group, DPBle& dpBle) {
         colrgnChain = {colrgn};
     }
 
-    clbMap.assign(database.sitemap_nx, vector<VPR_CLB*>(database.sitemap_ny, NULL));
+    //clbMap.assign(database.sitemap_nx, vector<VPR_CLB*>(database.sitemap_ny, NULL));
+    inChain.assign(groups.size(), false);
+
+    inChain[group.id] = true;
+    clbChain = {srcClb};
+    srcClb=NULL;
+    orderChain = {lgorder};
+    posChain = {(int)groups[group.id].x * database.sitemap_ny + (int)groups[group.id].y};
+    gidChain = {group.id};
+}
+
+void ChainFinder::Init(Group& group, DPBle& dpBle) {
+    VPR_CLB* srcClb = new VPR_CLB;
+    vector<int> lgorder;
+
+    for (auto gid : dpBle.dpData.groupMap[groups[group.id].x][groups[group.id].y]) {
+        if (gid != group.id) {
+            srcClb->TryAddInsts(groups[gid]);
+            lgorder.push_back(gid);
+        }
+    }
+
+    if (checkColrgn) {
+        unordered_map<Net*, int> colrgn = dpBle.dpData.colrgnData.GetColrgnData(group.x, group.y);
+        for (auto net : dpBle.dpData.colrgnData.group2Clk[group.id]) {
+            colrgn[net]--;
+            if (colrgn[net] == 0) colrgn.erase(colrgn.find(net));
+        }
+        colrgnChain = {colrgn};
+    }
+
+    //clbMap.assign(database.sitemap_nx, vector<VPR_CLB*>(database.sitemap_ny, NULL));
     inChain.assign(groups.size(), false);
 
     inChain[group.id] = true;
@@ -477,11 +522,11 @@ void ChainFinder::Init(Group& group, DPBle& dpBle) {
     gidChain = {group.id};
 }
 
-bool DPBle::OptrgnChainMove(Group& group) {
+bool DPBle::OptrgnChainMove(Group& group ,VPR_CLB*& srcCLB) {
     // return false;
 
     ChainFinder chainFinder(groups);
-    chainFinder.Init(group, *this);
+    chainFinder.Init(group, *this , srcCLB);
 
     if (chainFinder.DFS(*this)) {
         this->ChainUpdate(chainFinder.gidChain, chainFinder.clbChain, chainFinder.orderChain);

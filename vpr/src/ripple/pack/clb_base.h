@@ -12,7 +12,7 @@ public:
         static int gid = 0;
         id = gid++;
     }
-    virtual ~CLBBase(){};
+    virtual ~CLBBase(){}
     virtual bool AddInsts(const Group& group) = 0;
     virtual bool IsEmpty() = 0;
     virtual void GetResult(Group& group) = 0;

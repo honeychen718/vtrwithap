@@ -93,14 +93,15 @@ void Database::print() {
 }
 
 Master *Database::addMaster(const Master &master) {
-    if (getMaster(master.name) != NULL) {
-        cerr << "Master::Name: " << master.name << " duplicated" << endl;
-        return NULL;
-    }
-    Master *newmaster = new Master(master);
-    name_masters[master.name] = newmaster;
-    masters.push_back(newmaster);
-    return newmaster;
+    // if (getMaster(master.name) != NULL) {
+    //     cerr << "Master::Name: " << master.name << " duplicated" << endl;
+    //     return NULL;
+    // }
+    // Master *newmaster = new Master(master);
+    // name_masters[master.name] = newmaster;
+    // masters.push_back(newmaster);
+    // return newmaster;
+    assert(0);
 }
 Instance *Database::addInstance(const Instance &instance) {
     if (getInstance(instance.name) != NULL) {
@@ -134,14 +135,15 @@ Resource *Database::addResource(const Resource &resource) {
     return newresource;
 }
 SiteType *Database::addSiteType(const SiteType &sitetype) {
-    if (getSiteType(sitetype.name) != NULL) {
-        cerr << "SiteType: " << sitetype.name << " duplicated" << endl;
-        return NULL;
-    }
-    SiteType *newsitetype = new SiteType(sitetype);
-    name_sitetypes[sitetype.name] = newsitetype;
-    sitetypes.push_back(newsitetype);
-    return newsitetype;
+    // if (getSiteType(sitetype.name) != NULL) {
+    //     cerr << "SiteType: " << sitetype.name << " duplicated" << endl;
+    //     return NULL;
+    // }
+    // SiteType *newsitetype = new SiteType(sitetype);
+    // name_sitetypes[sitetype.name] = newsitetype;
+    // sitetypes.push_back(newsitetype);
+    // return newsitetype;
+    assert(0);
 }
 Site *Database::addSite(int x, int y, SiteType *sitetype) {
     if (x < 0 || x >= sitemap_nx || y < 0 || y >= sitemap_ny) {
@@ -179,9 +181,28 @@ SwitchBox *Database::addSwitchBox(int x, int y) {
 }
 
 Master *Database::getMaster(Master::Name name) {
-    auto mi = name_masters.find(name);
-    if (mi == name_masters.end()) return NULL;
-    return mi->second;
+    // auto mi = name_masters.find(name);
+    // if (mi == name_masters.end()) return NULL;
+    // return mi->second;
+    assert(0);
+}
+Master *Database::getMaster(const t_model* model , int num_lut_input_pins) {//for vpr model
+    string model_name = model->name;
+    VTR_ASSERT((model_name != ".names") != (num_lut_input_pins != -1));
+    if(model_name != ".names"){
+        for(Master* master : masters){
+            if(master->vpr_model == model){
+                return master;
+            }
+        }
+    }else{
+        for(Master* master : masters){
+            if(master->vpr_model == model && master->pins.size() == num_lut_input_pins + 1){
+                return master;
+            }
+        }
+    }
+    return NULL;
 }
 Instance *Database::getInstance(const string &name) {
     auto mi = name_instances.find(name);
@@ -216,6 +237,14 @@ SiteType *Database::getSiteType(SiteType::Name name) {
     if (mi == name_sitetypes.end()) return NULL;
     return mi->second;
 }
+SiteType *Database::getSiteType(const t_physical_tile_type_ptr tile_type){
+    for(auto& sitetype : sitetypes){
+        if(sitetype->physical_tile == tile_type){
+            return sitetype;
+        }
+    }
+}
+
 Site *Database::getSite(int x, int y) {
     if (x < 0 || x >= sitemap_nx || y < 0 || y >= sitemap_ny) {
         return NULL;
@@ -248,33 +277,33 @@ void Database::setSwitchBoxes(int nx, int ny) {
     }
 }
 
-bool Database::place(Instance *instance, int x, int y, int slot) {
-    Site *site = getSite(x, y);
-    return place(instance, site, slot);
-}
+// bool Database::place(Instance *instance, int x, int y, int slot) {
+//     Site *site = getSite(x, y);
+//     return place(instance, site, slot);
+// }
 
-bool Database::place(Instance *instance, Site *site, int slot) {
-    if (site == NULL) {
-        return false;
-    }
-    if (site->pack == NULL) {
-        site->pack = addPack(site->type);
-        site->pack->site = site;
-    }
-    if (slot < 0 || slot >= (int)site->pack->instances.size()) {
-        return false;
-    }
-    if (site->pack->instances[slot] != NULL) {
-        return false;
-    }
-    if (site->type->resources[slot] != instance->master->resource) {
-        return false;
-    }
-    site->pack->instances[slot] = instance;
-    instance->pack = site->pack;
-    instance->slot = slot;
-    return true;
-}
+// bool Database::place(Instance *instance, Site *site, int slot) {
+//     if (site == NULL) {
+//         return false;
+//     }
+//     if (site->pack == NULL) {
+//         site->pack = addPack(site->type);
+//         site->pack->site = site;
+//     }
+//     if (slot < 0 || slot >= (int)site->pack->instances.size()) {
+//         return false;
+//     }
+//     if (site->pack->instances[slot] != NULL) {
+//         return false;
+//     }
+//     if (site->type->resources[slot] != instance->master->resource) {
+//         return false;
+//     }
+//     site->pack->instances[slot] = instance;
+//     instance->pack = site->pack;
+//     instance->slot = slot;
+//     return true;
+// }
 
 bool Database::place(Instance *instance, int x, int y) {
     Site *site = getSite(x, y);
@@ -291,7 +320,7 @@ bool Database::place(Instance *instance, Site *site) {
     }
     site->pack->instances.push_back(instance);
     instance->pack = site->pack;
-    instance->slot = -2;
+    //instance->slot = -2;
     return true;
 }
 
@@ -301,7 +330,7 @@ bool Database::unplace(Instance *instance) {
     }
     instance->pack->RemoveInst(instance);
     instance->pack = NULL;
-    instance->slot = -1;
+    //instance->slot = -1;
     return true;
 }
 
@@ -359,50 +388,50 @@ bool Database::unplace(Pack *pack) {
 }
 
 bool Database::isPackValid(Pack *pack) {
-    if (pack->type->name == SiteType::SLICE) {
-        /***** LUT Rule *****/
-        for (int i = 0; i < 8; i++) {
-            Instance *a = pack->instances[2 * i];
-            Instance *b = pack->instances[2 * i + 1];
-            if (a == NULL || b == NULL) continue;
-            if (a->master->name == Master::LUT6) return false;
-            if (!IsLUTCompatible(*a, *b)) return false;
-        }
-        /***** FF Rule *****/
-        int ceset[4][4] = {{16, 18, 20, 22}, {17, 19, 21, 23}, {24, 26, 28, 30}, {25, 27, 29, 31}};
-        int ckset[2][8] = {{16, 17, 18, 19, 20, 21, 22, 23}, {24, 25, 26, 27, 28, 29, 30, 31}};  // srset is the same
-        for (int i = 0; i < 4; i++) {
-            Net *CENet = NULL;
-            for (int j = 0; j < 4; j++) {
-                auto *ins = pack->instances[ceset[i][j]];
-                if (ins != NULL) {
-                    if (CENet == NULL)
-                        CENet = ins->pins[cePinIdx]->net;
-                    else if (ins->pins[cePinIdx]->net != CENet)
-                        return false;
-                }
-            }
-        }
-        for (int i = 0; i < 2; i++) {
-            Net *ClkNet = NULL;
-            Net *SRNet = NULL;
-            for (int j = 0; j < 8; j++) {
-                auto ins = pack->instances[ckset[i][j]];
-                if (ins != NULL) {
-                    // clk
-                    if (ClkNet == NULL)
-                        ClkNet = ins->pins[clkPinIdx]->net;
-                    else if (ins->pins[clkPinIdx]->net != ClkNet)
-                        return false;
-                    // sr
-                    if (SRNet == NULL)
-                        SRNet = ins->pins[srPinIdx]->net;
-                    else if (ins->pins[srPinIdx]->net != SRNet)
-                        return false;
-                }
-            }
-        }
-    }
+    // if (pack->type->name == SiteType::SLICE) {
+    //     /***** LUT Rule *****/
+    //     for (int i = 0; i < 8; i++) {
+    //         Instance *a = pack->instances[2 * i];
+    //         Instance *b = pack->instances[2 * i + 1];
+    //         if (a == NULL || b == NULL) continue;
+    //         if (a->master->name == Master::LUT6) return false;
+    //         if (!IsLUTCompatible(*a, *b)) return false;
+    //     }
+    //     /***** FF Rule *****/
+    //     int ceset[4][4] = {{16, 18, 20, 22}, {17, 19, 21, 23}, {24, 26, 28, 30}, {25, 27, 29, 31}};
+    //     int ckset[2][8] = {{16, 17, 18, 19, 20, 21, 22, 23}, {24, 25, 26, 27, 28, 29, 30, 31}};  // srset is the same
+    //     for (int i = 0; i < 4; i++) {
+    //         Net *CENet = NULL;
+    //         for (int j = 0; j < 4; j++) {
+    //             auto *ins = pack->instances[ceset[i][j]];
+    //             if (ins != NULL) {
+    //                 if (CENet == NULL)
+    //                     CENet = ins->pins[cePinIdx]->net;
+    //                 else if (ins->pins[cePinIdx]->net != CENet)
+    //                     return false;
+    //             }
+    //         }
+    //     }
+    //     for (int i = 0; i < 2; i++) {
+    //         Net *ClkNet = NULL;
+    //         Net *SRNet = NULL;
+    //         for (int j = 0; j < 8; j++) {
+    //             auto ins = pack->instances[ckset[i][j]];
+    //             if (ins != NULL) {
+    //                 // clk
+    //                 if (ClkNet == NULL)
+    //                     ClkNet = ins->pins[clkPinIdx]->net;
+    //                 else if (ins->pins[clkPinIdx]->net != ClkNet)
+    //                     return false;
+    //                 // sr
+    //                 if (SRNet == NULL)
+    //                     SRNet = ins->pins[srPinIdx]->net;
+    //                 else if (ins->pins[srPinIdx]->net != SRNet)
+    //                     return false;
+    //             }
+    //         }
+    //     }
+    // }
     return true;
 }
 
@@ -476,23 +505,23 @@ int Database::getRouteNet() {
     return totalRouteNet;
 }
 
-int Database::getTotNumDupInputs() {
-    int tot = 0;
-    for (auto &ss : sites)
-        for (auto s : ss)
-            if (s) {
-                auto pack = s->pack;
-                if (pack && pack->type->name == SiteType::SLICE) {
-                    for (int i = 0; i < 8; i++) {
-                        Instance *a = pack->instances[2 * i];
-                        Instance *b = pack->instances[2 * i + 1];
-                        if (a == NULL || b == NULL) continue;
-                        tot += NumDupInputs(*a, *b);
-                    }
-                }
-            }
-    return tot;
-}
+// int Database::getTotNumDupInputs() {
+//     int tot = 0;
+//     for (auto &ss : sites)
+//         for (auto s : ss)
+//             if (s) {
+//                 auto pack = s->pack;
+//                 if (pack && pack->type->name == SiteType::SLICE) {
+//                     for (int i = 0; i < 8; i++) {
+//                         Instance *a = pack->instances[2 * i];
+//                         Instance *b = pack->instances[2 * i + 1];
+//                         if (a == NULL || b == NULL) continue;
+//                         tot += NumDupInputs(*a, *b);
+//                     }
+//                 }
+//             }
+//     return tot;
+// }
 
 bool Database::isPlacementValid() {
     for (int i = 0; i < (int)sites.size(); i++) {
@@ -509,13 +538,13 @@ bool Database::isPlacementValid() {
             return false;
         }
     }
-    for (int i = 0; i < (int)instances.size(); i++) {
-        // cout<<instances[i]->id<<endl;
-        if (instances[i]->pack->instances[instances[i]->slot] != instances[i]) {
-            printlog(LOG_ERROR, "error in instance->pack->instance consistency validation");
-            return false;
-        }
-    }
+    // for (int i = 0; i < (int)instances.size(); i++) {
+    //     // cout<<instances[i]->id<<endl;
+    //     if (instances[i]->pack->instances[instances[i]->slot] != instances[i]) {
+    //         printlog(LOG_ERROR, "error in instance->pack->instance consistency validation");
+    //         return false;
+    //     }
+    // }
     for (int i = 0; i < (int)packs.size(); i++) {
         for (int j = 0; j < (int)packs[i]->instances.size(); j++) {
             if (packs[i]->instances[j] != NULL && packs[i]->instances[j]->pack != packs[i]) {
@@ -785,66 +814,66 @@ Database::PinRule Database::getPinRule(Instance *inst) {
     printlog(LOG_ERROR, "Pin rule not known.");
     return PinRuleNone;
 }
-int Database::getIOY(Instance *inst) {
-    assert(inst->IsIO() && inst->pack && inst->pack->site);
-    auto site = inst->pack->site;
-    auto rule = getPinRule(inst);
-    if (rule == PinRuleInput || rule == PinRuleOutput || rule == PinRuleInputS || rule == PinRuleOutputS) {
-        return site->y + 0.5 + pinSwitchBoxMap[rule][inst->slot];
-    } else /* rule == PinRuleNone) */ {
-        return site->cy();
-    }
-}
-void Database::setSwitchBoxPins(Instance *inst) {
-    auto site = inst->pack->site;
-    int sbx, sby;
-    int x = site->x, y = site->y;
-    auto rule = getPinRule(inst);
+// int Database::getIOY(Instance *inst) {
+//     assert(inst->IsIO() && inst->pack && inst->pack->site);
+//     auto site = inst->pack->site;
+//     auto rule = getPinRule(inst);
+//     if (rule == PinRuleInput || rule == PinRuleOutput || rule == PinRuleInputS || rule == PinRuleOutputS) {
+//         return site->y + 0.5 + pinSwitchBoxMap[rule][inst->slot];
+//     } else /* rule == PinRuleNone) */ {
+//         return site->cy();
+//     }
+// }
+// void Database::setSwitchBoxPins(Instance *inst) {
+//     auto site = inst->pack->site;
+//     int sbx, sby;
+//     int x = site->x, y = site->y;
+//     auto rule = getPinRule(inst);
 
-    sbx = SWCol(x);
-    sby = y;
-    if (rule == PinRuleSlice) {
-        vector<Pin *> &sbPins = switchboxes[sbx][sby]->pins;
-        sbPins.insert(sbPins.end(), inst->pins.begin(), inst->pins.end());
-    } else if (rule == PinRuleDSP0 || rule == PinRuleDSP1 || rule == PinRuleBRAM) {
-        if (rule == PinRuleDSP1) sby = y - 2;
-        for (int i = 0; i < (int)inst->pins.size(); i++) {
-            Pin *pin = inst->pins[i];
-            int offset = pinSwitchBoxMap[rule][i];
-            if (offset >= 0) {
-                switchboxes[sbx][sby + offset]->pins.push_back(pin);
-            }
-        }
-    } else if (rule == PinRuleInput || rule == PinRuleOutput || rule == PinRuleInputS || rule == PinRuleOutputS) {
-        int offset = pinSwitchBoxMap[rule][inst->slot];
-        vector<Pin *> &sbPins = switchboxes[sbx][sby + offset]->pins;
-        sbPins.insert(sbPins.end(), inst->pins.begin(), inst->pins.end());
-    } else if (rule == PinRuleNone) {
-        sby = y + site->h / 2;
-        vector<Pin *> &sbPins = switchboxes[sbx][sby]->pins;
-        sbPins.insert(sbPins.end(), inst->pins.begin(), inst->pins.end());
-    } else {
-        printlog(LOG_ERROR, "pin mapping rule not handled");
-    }
-}
-void Database::setSwitchBoxPins() {
-    for (int x = 0; x < switchbox_nx; x++) {
-        for (int y = 0; y < switchbox_ny; y++) {
-            switchboxes[x][y]->pins.clear();
-        }
-    }
-    Site *prevSite = NULL;
-    for (int x = 0; x < sitemap_nx; x++) {
-        for (int y = 0; y < sitemap_ny; y++) {
-            Site *site = sites[x][y];
-            if (site->pack == NULL || site == prevSite) continue;
-            for (auto inst : site->pack->instances) {
-                if (inst != NULL) setSwitchBoxPins(inst);
-            }
-            prevSite = site;
-        }
-    }
-}
+//     sbx = SWCol(x);
+//     sby = y;
+//     if (rule == PinRuleSlice) {
+//         vector<Pin *> &sbPins = switchboxes[sbx][sby]->pins;
+//         sbPins.insert(sbPins.end(), inst->pins.begin(), inst->pins.end());
+//     } else if (rule == PinRuleDSP0 || rule == PinRuleDSP1 || rule == PinRuleBRAM) {
+//         if (rule == PinRuleDSP1) sby = y - 2;
+//         for (int i = 0; i < (int)inst->pins.size(); i++) {
+//             Pin *pin = inst->pins[i];
+//             int offset = pinSwitchBoxMap[rule][i];
+//             if (offset >= 0) {
+//                 switchboxes[sbx][sby + offset]->pins.push_back(pin);
+//             }
+//         }
+//     } else if (rule == PinRuleInput || rule == PinRuleOutput || rule == PinRuleInputS || rule == PinRuleOutputS) {
+//         int offset = pinSwitchBoxMap[rule][inst->slot];
+//         vector<Pin *> &sbPins = switchboxes[sbx][sby + offset]->pins;
+//         sbPins.insert(sbPins.end(), inst->pins.begin(), inst->pins.end());
+//     } else if (rule == PinRuleNone) {
+//         sby = y + site->h / 2;
+//         vector<Pin *> &sbPins = switchboxes[sbx][sby]->pins;
+//         sbPins.insert(sbPins.end(), inst->pins.begin(), inst->pins.end());
+//     } else {
+//         printlog(LOG_ERROR, "pin mapping rule not handled");
+//     }
+// }
+// void Database::setSwitchBoxPins() {
+//     for (int x = 0; x < switchbox_nx; x++) {
+//         for (int y = 0; y < switchbox_ny; y++) {
+//             switchboxes[x][y]->pins.clear();
+//         }
+//     }
+//     Site *prevSite = NULL;
+//     for (int x = 0; x < sitemap_nx; x++) {
+//         for (int y = 0; y < sitemap_ny; y++) {
+//             Site *site = sites[x][y];
+//             if (site->pack == NULL || site == prevSite) continue;
+//             for (auto inst : site->pack->instances) {
+//                 if (inst != NULL) setSwitchBoxPins(inst);
+//             }
+//             prevSite = site;
+//         }
+//     }
+// }
 
 void Database::setCellPinIndex() {
     Master *FF = getMaster(Master::FDRE);
@@ -958,6 +987,7 @@ t_pack_molecule* TurnGroupsIntoMolecules(vector<Group>& groups,
         list_of_molecules_head = cur_molecule;
 
         group.vpr_molecule=cur_molecule;
+        assert(num_blocks!=0);
         //cout<<endl;
 
     }

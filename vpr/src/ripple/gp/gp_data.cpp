@@ -414,11 +414,11 @@ void gp_copy_group_in(vector<Group> &groups) {
                 cellH[p_i] = 0;
                 if (pin->instance->master->name == Master::IBUF) {
                     cellX[p_i] = site->x /*+ 0.5 * site->w*/;
-                    cellY[p_i] = site->y + 0.5 + database.pinSwitchBoxMap[Database::PinRuleInput][pin->instance->slot];
+                    cellY[p_i] = site->y;
                     ioNet = true;
                 } else if (pin->instance->master->name == Master::OBUF) {
                     cellX[p_i] = site->x /*+ 0.5 * site->w*/;
-                    cellY[p_i] = site->y + 0.5 + database.pinSwitchBoxMap[Database::PinRuleOutput][pin->instance->slot];
+                    cellY[p_i] = site->y;
                     ioNet = true;
                 } else {
                     cellX[p_i] = site->cx();

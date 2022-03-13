@@ -36,6 +36,7 @@ public:
 
     bool DFS(DPBle &dpBle);
     void Init(Group &group, DPBle &dpBle);
+    void Init(Group &group, DPBle &dpBle, VPR_CLB*& srcClb);
 
     ChainFinder(vector<Group> &_groups);
 };

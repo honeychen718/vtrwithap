@@ -193,7 +193,7 @@ class ClusteredNetlist : public Netlist<ClusterBlockId, ClusterPortId, ClusterPi
      *   @param type   The type of the CLB
      */
     ClusterBlockId create_block(const char* name, t_pb* pb, t_logical_block_type_ptr type);
-
+    ClusterBlockId update_block(const ClusterBlockId blk_id, t_pb* pb);
     /**
      * @brief Create or return an existing port in the netlist
      *

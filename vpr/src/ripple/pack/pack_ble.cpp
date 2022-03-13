@@ -217,7 +217,7 @@ void PackBLE::PairLUTs() {
             auto numDupInputs = NumDupInputs(*database.instances[i], *database.instances[j]);  // reduce routing demand
             auto numDistInputs = tot - 2 - numDupInputs;
             if (numDistInputs <= 5) {  // constraint 2: number of distinct inputs is fewer than 5
-                double dist = abs(instPoss[i].x - instPoss[j].x) / 2 + abs(instPoss[i].y - instPoss[j].y);
+                double dist = abs(instPoss[i].x - instPoss[j].x) + abs(instPoss[i].y - instPoss[j].y);
                 if (numDupInputs > 1 && dist < mergeRange) {  // constraint 3&4: shared inputs, distance
                     packedValidConnPair[i].insert(j);
                     packedValidConnPair[j].insert(i);
@@ -376,4 +376,76 @@ void PackBLE::GetResult(vector<Group>& groups) const {
             groups.push_back(group);
         }
     }
+}
+
+void get_num_luts_and_ffs(const t_pb_type* pb_type, const t_pb_type* le_pb_type, vector<pair<int,int>>& num_luts_and_ffs) {
+    if (pb_type->blif_model != nullptr) {
+        //Leaf pb_type
+        VTR_ASSERT(pb_type->num_modes == 0);
+        string model_name(pb_type->blif_model);
+        if(model_name==".names" && pb_type->num_pb==1){
+            pb_type=pb_type->parent_mode->parent_pb_type;
+            if(pb_type->parent_mode->num_pb_type_children == 2){
+                int another_pb_type_index=(&pb_type->parent_mode->pb_type_children[0]==pb_type) ? 1 : 0;
+                const t_pb_type* another_pb_type = &pb_type->parent_mode->pb_type_children[another_pb_type_index];
+                model_name = another_pb_type->blif_model;
+                if(model_name==".latch"){
+                    pair<int, int> lut_ff = {pb_type->num_pb, another_pb_type->num_pb};
+                    pb_type=pb_type->parent_mode->parent_pb_type;
+                    while(pb_type!=le_pb_type){
+                        lut_ff.first *= pb_type->num_pb;
+                        lut_ff.second *= pb_type->num_pb;
+                        pb_type=pb_type->parent_mode->parent_pb_type;
+                    }
+                    num_luts_and_ffs.push_back(lut_ff);
+                }
+            }
+        }
+    } else{
+        for (int imode = 0; imode < pb_type->num_modes; ++imode) {
+            const t_mode* mode = &pb_type->modes[imode];
+            
+            for (int ichild = 0; ichild < mode->num_pb_type_children; ++ichild) {
+                const t_pb_type* pb_type_child = &mode->pb_type_children[ichild];
+                get_num_luts_and_ffs(pb_type_child, le_pb_type, num_luts_and_ffs);
+            }
+        }
+    }
+}
+
+bool PackBLE::Can_Pair_Luts(){
+    //map<model , vector<logical_block_type>>
+    auto primitive_candidate_block_types = identify_primitive_candidate_block_types();
+
+    // find the cluster type that has lut primitives
+    auto logic_block_type = identify_logic_block_type(primitive_candidate_block_types);
+
+    //logic block has ff?
+    bool hasff = false;
+    std::string ff_name = ".latch";
+    for (auto& model : primitive_candidate_block_types) {
+        std::string model_name(model.first->name);
+        if (model_name == ff_name){
+            for(auto& type : model.second){
+                if(type == logic_block_type){
+                    hasff=true;
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
+    // find a LE pb_type within the found logic_block_type
+    auto le_pb_type = identify_le_block_type(logic_block_type);
+
+    //get num luts and ffs in all mode combinations 
+    vector<pair<int,int>> num_luts_and_ffs;
+    get_num_luts_and_ffs(le_pb_type, le_pb_type, num_luts_and_ffs);
+    for(auto& num : num_luts_and_ffs){
+        if(num.first==2 && num.second==2){
+            return true;
+        }
+    }
+    return false;
 }

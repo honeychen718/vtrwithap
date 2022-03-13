@@ -398,7 +398,7 @@ bool Legalizer::MergeMoleculeToSite(Site* site, t_pack_molecule* molecule,
     }
     
     ClusterBlockId clb_index;
-    if(!clb->valid){
+    if(!clb->CLBIsEmpty){
         clb_index=(ClusterBlockId)num_clb;
         success=vpr_start_new_cluster(  clb,molecule,packer_opts,lb_type_rr_graphs,
                                         atom_molecules,
@@ -408,7 +408,7 @@ bool Legalizer::MergeMoleculeToSite(Site* site, t_pack_molecule* molecule,
                                         cluster_placement_stats);
         if(success){
             //router_data=nullptr;
-            clb->valid=true;
+            clb->CLBIsEmpty=true;
             clb->index=clb_index;
             num_clb++;
         }
@@ -471,7 +471,7 @@ bool Legalizer::AssignPackToSite(Site* site, Group& group) {
         database.place(database.addPack(site->type), site->x, site->y);
         for (unsigned i = 0; i < group.instances.size(); i++) {
             if (group.instances[i] != NULL) {
-                database.place(group.instances[i], site, i);
+                database.place(group.instances[i], site);
             } else {
                 site->pack->instances[i] = NULL;
             }
@@ -582,11 +582,14 @@ void Legalizer::SortGroupsByOptRgnDist() {
 
 Legalizer::Legalizer(vector<Group>& _groups) : groups(_groups), lgData(_groups) {}
 
-void Legalizer::Init(lgPackMethod packMethod) { lgData.Init(packMethod); }
+void Legalizer::Init(lgPackMethod packMethod) { 
+    mark_all_molecules_valid(database.list_of_pack_molecules);
+    lgData.Init(packMethod); 
+}
 
-void Legalizer::GetResult(lgRetrunGroup retGroup) {
+void Legalizer::GetResult(lgRetrunGroup retGroup,lgGetResultMethod all_or_partial) {
     lgData.GetDispStatics();
-    lgData.GetResult(retGroup);//modified by jia 
+    lgData.GetResult(retGroup,all_or_partial);//modified by jia 
     lgData.GetPackStatics();
 }
 
@@ -836,7 +839,7 @@ bool Legalizer::RunAll( lgSiteOrder siteOrder,
         for(int y=0;y<database.sitemap_ny;y++){
             for(int i=0;i< database.subtile_capacity[database.getSite(x,y)->type] ; i++){
                 VPR_CLB* clb=&lgData.clbMap[x][y][i];
-                if(clb!=nullptr && clb->valid){
+                if(clb!=nullptr && clb->CLBIsEmpty){
                     intra_lb_routing.push_back(clb->router_data->saved_lb_nets);
                     //VTR_ASSERT((int)intra_lb_routing.size() == num_clb);
                     // if((int)intra_lb_routing.size() != num_clb){

@@ -61,7 +61,7 @@ void ColrgnLG::GetResult(vector<Group> &groups) {
                 clbMap[x][y]->GetResult(tmpGroup);
                 for (int i = 0; i < 32; i++) {
                     if (tmpGroup.instances[i] != NULL) {
-                        database.place(tmpGroup.instances[i], database.getSite(x, y), i);
+                        database.place(tmpGroup.instances[i], database.getSite(x, y));
                     }
                 }
             }

@@ -10,6 +10,7 @@ void packble(vector<Group>& groups) {
     printlog(LOG_INFO, "*******************************************************************");
     packble.PairLUTFF();
     printlog(LOG_INFO, "*******************************************************************");
+    packble.Can_Pair_Luts();
     packble.PairLUTs();
     printlog(LOG_INFO, "*******************************************************************");
     packble.PackSingFF();
@@ -37,7 +38,7 @@ void maxLutFfCon(const DPData& dpData) {
             dpData.clbMap[x][y]->GetFinalResult(res);
             auto& insts = res.instances;
             for (unsigned i = 0; i < insts.size(); ++i)
-                if (insts[i] != NULL) database.place(insts[i], site, i);
+                if (insts[i] != NULL) database.place(insts[i], site);
         }
     }
 

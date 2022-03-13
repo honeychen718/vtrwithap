@@ -62,18 +62,20 @@ void VPR_Pack_Data::Init(){
     }
 }
 
-void VPR_Pack_Data::Free(int free_mode = FREE_ALL_FOR_REPACK){
+void VPR_Pack_Data::Free(int free_mode, bool outputclustering){
     t_packer_opts& packer_opts = database.vpr_setup->PackerOpts;
     auto& cluster_ctx = g_vpr_ctx.mutable_clustering();
     VTR_ASSERT(num_clb == (int)cluster_ctx.clb_nlist.blocks().size());
-    check_clustering();
+    if(outputclustering){
+        check_clustering();
 
-    if (getEchoEnabled() && isEchoFileEnabled(E_ECHO_CLUSTERS)) {
-        echo_clusters(getEchoFileName(E_ECHO_CLUSTERS));
+        if (getEchoEnabled() && isEchoFileEnabled(E_ECHO_CLUSTERS)) {
+            echo_clusters(getEchoFileName(E_ECHO_CLUSTERS));
+        }
+        
+        //insert a bug!!!! 
+        output_clustering(intra_lb_routing, packer_opts.global_clocks, database.is_clock, database.arch->architecture_id, packer_opts.output_file.c_str(), false);
     }
-    
-    //insert a bug!!!!
-    output_clustering(intra_lb_routing, packer_opts.global_clocks, database.is_clock, database.arch->architecture_id, packer_opts.output_file.c_str(), false);
 
     VTR_ASSERT(cluster_ctx.clb_nlist.blocks().size() == intra_lb_routing.size());
     for (auto blk_id : cluster_ctx.clb_nlist.blocks())

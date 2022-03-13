@@ -302,8 +302,6 @@ void gp_cong(vector<Group>& groups, int iteration) {
         // inflate
         AdjAreaByCong(groups);
 
-        mark_all_molecules_valid(database.list_of_pack_molecules);
-
         // gp again
         gplace(groups);
 

@@ -27,17 +27,37 @@ public:
         RAMB36E2,  // RAM
         IBUF,
         OBUF,
-        BUFGCE  // IO: input buf, output buf, clock buf
+        BUFGCE,  // IO: input buf, output buf, clock buf
+        UNKNOWN
     };
     static Name NameString2Enum(const string &name);
     static string NameEnum2String(const Master::Name &name);
+    unordered_map<string , Master::Name> model_name_to_master_name{//all possible model name in vpr arch ,should update constantly
+        {"adder" , CARRY8},
+        {"multiply" , DSP48E2},
+        {"single_port_ram" , RAMB36E2},
+        {"dual_port_ram" , RAMB36E2},
+        {".input" , IBUF},
+        {".output" , OBUF},
+        {".latch" , FDRE}
+    };
+    vector<Master::Name> lut_master_names{
+        LUT1,
+        LUT2,
+        LUT3,
+        LUT4,
+        LUT5,
+        LUT6};
 
     Name name;
+    const t_model *vpr_model;
     Resource *resource;
     vector<RipplePinType *> pins;
 
     Master(Name n);
     Master(const Master &master);
+    Master(const t_model* model);
+    Master(const t_model* model , int num_input_pins);
     ~Master();
 
     void addPin(RipplePinType &pin);
@@ -53,7 +73,7 @@ public:
     string name;
     Master *master;
     Pack *pack;
-    int slot;
+    //int slot;
     bool fixed;
     bool inputFixed;
     vector<Pin *> pins;

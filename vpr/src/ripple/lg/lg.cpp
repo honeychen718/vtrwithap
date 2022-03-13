@@ -11,13 +11,13 @@ void legalize(vector<Group> &groups, lgSiteOrder siteOrder, lgRetrunGroup retGro
     double begHpwl = 0;
 
     Legalizer legalizer(groups);
-    legalizer.Init(USE_CLB2);
+    legalizer.Init(USE_VPR_CLB);
 
     begHpwl = legalizer.GetHpwl();
 
     if (!legalizer.RunAll(siteOrder, DEFAULT)) {
         // perform lg with SortGroupsByLGBox
-        legalizer.Init(USE_CLB2);
+        legalizer.Init(USE_VPR_CLB);
         legalizer.RunAll(siteOrder, GROUP_LGBOX);
     }
 
@@ -43,7 +43,7 @@ void legalize_partial(vector<Group> &groups) {
 
     double begHpwl = legalizer.GetHpwl();
     legalizer.RunPartial();
-    legalizer.GetResult(UPDATE_XY);
+    legalizer.GetResult(UPDATE_XY,GET_PARTIAL);
     double aftHpwl = legalizer.GetHpwl();
     printlog(LOG_INFO,
              "WL Before LG: %.0f, WL After LG:%.0f, Gap: %.2f%%",

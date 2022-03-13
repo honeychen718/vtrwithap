@@ -10,6 +10,12 @@ using namespace db;
 extern t_molecule_link* unclustered_list_head;
 extern t_molecule_link* memory_pool; /*Declared here so I can free easily.*/
 
+// auto& cluster_ctx = g_vpr_ctx.mutable_clustering();
+// t_packer_opts &packer_opts = database.vpr_setup->PackerOpts;
+// auto& atom_ctx = g_vpr_ctx.atom();
+// auto& device_ctx = g_vpr_ctx.mutable_device();
+// auto& floorplanning_ctx = g_vpr_ctx.mutable_floorplanning();
+
 
 class VPR_Pack_Data{
 public:
@@ -27,5 +33,5 @@ public:
     vtr::vector<ClusterBlockId, std::vector<AtomNetId>> clb_inter_blk_nets;
 
     void Init();
-    void Free(int);
+    void Free(int free_mode = FREE_ALL_FOR_REPACK , bool outputclustering = true);
 };

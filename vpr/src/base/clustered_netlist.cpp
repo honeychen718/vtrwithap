@@ -133,6 +133,13 @@ ClusterBlockId ClusteredNetlist::create_block(const char* name, t_pb* pb, t_logi
     return blk_id;
 }
 
+ClusterBlockId ClusteredNetlist::update_block(const ClusterBlockId blk_id, t_pb* pb){
+    VTR_ASSERT(block_pb(blk_id));
+    free_pb(block_pb(blk_id));
+    delete block_pb(blk_id);
+    block_pbs_[blk_id]=pb;
+}
+
 ClusterPortId ClusteredNetlist::create_port(const ClusterBlockId blk_id, const std::string name, BitIndex width, PortType type) {
     ClusterPortId port_id = find_port(blk_id, name);
     if (!port_id) {

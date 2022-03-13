@@ -152,9 +152,9 @@ static void add_molecule_to_pb_stats_candidates(t_pack_molecule* molecule,
 
 // static void free_pb_stats_recursive(t_pb* pb);
 
-static void try_update_lookahead_pins_used(t_pb* cur_pb);
+// static void try_update_lookahead_pins_used(t_pb* cur_pb);
 
-static void reset_lookahead_pins_used(t_pb* cur_pb);
+// static void reset_lookahead_pins_used(t_pb* cur_pb);
 
 static void compute_and_mark_lookahead_pins_used(const AtomBlockId blk_id);
 
@@ -164,7 +164,7 @@ static void compute_and_mark_lookahead_pins_used_for_pin(const t_pb_graph_pin* p
 
 static void commit_lookahead_pins_used(t_pb* cur_pb);
 
-static bool check_lookahead_pins_used(t_pb* cur_pb, t_ext_pin_util max_external_pin_util);
+// static bool check_lookahead_pins_used(t_pb* cur_pb, t_ext_pin_util max_external_pin_util);
 
 static bool primitive_feasible(const AtomBlockId blk_id, t_pb* cur_pb);
 
@@ -221,7 +221,7 @@ static enum e_block_pack_status atom_cluster_floorplanning_check(const AtomBlock
                                                                  PartitionRegion& temp_cluster_pr,
                                                                  bool& cluster_pr_needs_update);
 
-static void revert_place_atom_block(const AtomBlockId blk_id, t_lb_router_data* router_data, const std::multimap<AtomBlockId, t_pack_molecule*>& atom_molecules);
+// static void revert_place_atom_block(const AtomBlockId blk_id, t_lb_router_data* router_data, const std::multimap<AtomBlockId, t_pack_molecule*>& atom_molecules);
 
 static void update_connection_gain_values(const AtomNetId net_id, const AtomBlockId clustered_blk_id, t_pb* cur_pb, enum e_net_relation_to_clustered_block net_relation_to_clustered_block);
 
@@ -344,7 +344,7 @@ static void load_transitive_fanout_candidates(ClusterBlockId cluster_index,
 
 // static std::map<const t_model*, std::vector<t_logical_block_type_ptr>> identify_primitive_candidate_block_types();
 
-static void update_molecule_chain_info(t_pack_molecule* chain_molecule, const t_pb_graph_node* root_primitive);
+// static void update_molecule_chain_info(t_pack_molecule* chain_molecule, const t_pb_graph_node* root_primitive);
 
 static enum e_block_pack_status check_chain_root_placement_feasibility(const t_pb_graph_node* pb_graph_node,
                                                                        const t_pack_molecule* molecule,
@@ -1285,7 +1285,7 @@ void alloc_and_load_pb_stats(t_pb* pb, const int feasible_block_array_size) {
  * pb and also freeing its name. This prepares the pb for another round of
  * molecule packing tryout. 
  */
-static bool cleanup_pb(t_pb* pb) {
+bool cleanup_pb(t_pb* pb) {
     bool can_free = true;
 
     /* Recursively check if there are any children with already assigned atoms */
@@ -1773,7 +1773,7 @@ static enum e_block_pack_status atom_cluster_floorplanning_check(const AtomBlock
 
 /* Revert trial atom block iblock and free up memory space accordingly
  */
-static void revert_place_atom_block(const AtomBlockId blk_id, t_lb_router_data* router_data, const std::multimap<AtomBlockId, t_pack_molecule*>& atom_molecules) {
+void revert_place_atom_block(const AtomBlockId blk_id, t_lb_router_data* router_data, const std::multimap<AtomBlockId, t_pack_molecule*>& atom_molecules) {
     auto& atom_ctx = g_vpr_ctx.mutable_atom();
 
     //We cast away const here since we may free the pb, and it is
@@ -3134,7 +3134,7 @@ static int compare_molecule_gain(const void* a, const void* b) {
  * Runtime is actually not that bad for this.  It's worst case O(k^2) where k is the
  * number of pb_graph pins.  Can use hash tables or make incremental if becomes an issue.
  */
-static void try_update_lookahead_pins_used(t_pb* cur_pb) {
+void try_update_lookahead_pins_used(t_pb* cur_pb) {
     int i, j;
     const t_pb_type* pb_type = cur_pb->pb_graph_node->pb_type;
 
@@ -3161,7 +3161,7 @@ static void try_update_lookahead_pins_used(t_pb* cur_pb) {
 }
 
 /* Resets nets used at different pin classes for determining pin feasibility */
-static void reset_lookahead_pins_used(t_pb* cur_pb) {
+void reset_lookahead_pins_used(t_pb* cur_pb) {
     int i, j;
     const t_pb_type* pb_type = cur_pb->pb_graph_node->pb_type;
     if (cur_pb->pb_stats == nullptr) {
@@ -3388,7 +3388,7 @@ static t_pb_graph_pin* get_driver_pb_graph_pin(const t_pb* driver_pb, const Atom
 }
 
 /* Check if the number of available inputs/outputs for a pin class is sufficient for speculatively packed blocks */
-static bool check_lookahead_pins_used(t_pb* cur_pb, t_ext_pin_util max_external_pin_util) {
+bool check_lookahead_pins_used(t_pb* cur_pb, t_ext_pin_util max_external_pin_util) {
     const t_pb_type* pb_type = cur_pb->pb_graph_node->pb_type;
 
     if (pb_type->num_modes > 0 && cur_pb->name) {
@@ -3600,7 +3600,7 @@ static void print_seed_gains(const char* fname, const std::vector<AtomBlockId>& 
  * will update the chain id value inside the chain info data structure of this
  * molecule
  */
-static void update_molecule_chain_info(t_pack_molecule* chain_molecule, const t_pb_graph_node* root_primitive) {
+void update_molecule_chain_info(t_pack_molecule* chain_molecule, const t_pb_graph_node* root_primitive) {
     VTR_ASSERT(chain_molecule->chain_info->chain_id == -1 && chain_molecule->chain_info->is_long_chain);
 
     auto chain_root_pins = chain_molecule->pack_pattern->chain_root_pins;

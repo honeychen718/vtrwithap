@@ -49,5 +49,5 @@ void dplace(vector<Group> &groups, const int numIter) {
         printlog(LOG_ERROR, "dp not legal");
     }
 
-    maxLutFfCon(dpData);
+    //maxLutFfCon(dpData);
 }

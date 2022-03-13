@@ -23,7 +23,7 @@ private:
 public:
     CLB2(int i) : CLBBase(i), LUTs2(i) {}
     CLB2() : CLBBase(), LUTs2(id) {}
-    ~CLB2(){};
+    ~CLB2(){}
     bool AddInst(Instance* inst);
     bool AddInsts(const Group& group) { return AddInsts(group.instances); }
     inline bool IsEmpty() { return numLUT == 0 && numFF == 0; }

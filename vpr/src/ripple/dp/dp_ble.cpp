@@ -38,7 +38,7 @@ bool DPBle::IsGroupMovable(Group& group, VPR_CLB*& sourceCLB, vector<int>& sourc
         for (unsigned g = 0; g < dpData.groupMap[site->x][site->y].size(); g++) {
             Group& placedGroup = groups[dpData.groupMap[site->x][site->y][g]];
             if (placedGroup.id != group.id) {
-                if (!sourceCLB->AddInsts(placedGroup)) {
+                if (!sourceCLB->TryAddInsts(placedGroup)) {
                     return false;
                 }
                 sourceGroup.push_back(placedGroup.id);
@@ -48,18 +48,27 @@ bool DPBle::IsGroupMovable(Group& group, VPR_CLB*& sourceCLB, vector<int>& sourc
     return true;
 }
 
+
 bool DPBle::MoveGroupToSite(Site* site, Group& group, VPR_CLB*& sourceCLB, vector<int>& sourceGroup) {
     if (group.x == site->cx() && group.y == site->cy()) return true;
 
-    if (!dpData.clbMap[site->x][site->y]->AddInsts(group)) return false;
+    if (!dpData.clbMap[site->x][site->y]->TryAddInsts(group)) return false;
 
     dpData.groupMap[group.x][group.y] = sourceGroup;
     dpData.groupMap[site->x][site->y].push_back(group.id);
 
-    delete dpData.clbMap[group.x][group.y];
-    dpData.clbMap[group.x][group.y] = sourceCLB;
+    // delete dpData.clbMap[group.x][group.y];
+    // dpData.clbMap[group.x][group.y] = sourceCLB;
 
-    sourceCLB = NULL;
+    // auto& clb_nlist = g_vpr_ctx.mutable_clustering().clb_nlist;
+    // dpData.clbMap[group.x][group.y]->temp_cluster_pr = sourceCLB->temp_cluster_pr;
+    // dpData.clbMap[group.x][group.y]->pb = sourceCLB->pb;
+    // clb_nlist.update_block(dpData.clbMap[group.x][group.y]->index,sourceCLB->pb); 
+    // delete sourceCLB;
+    // sourceCLB = NULL;
+
+    //dpData.UpdateCLB(dpData.clbMap[group.x][group.y],sourceCLB);
+    dpData.UpdateCLB(sourceCLB);
 
     return true;
 }
@@ -83,10 +92,25 @@ void DPBle::DumpToDB() {
             dpData.clbMap[x][y]->GetResult(res);
             for (unsigned i = 0; i < res.instances.size(); i++) {
                 if (res.instances[i] != NULL) {
-                    database.place(res.instances[i], site, i);
+                    if(!database.place(res.instances[i], site)){
+                        assert(false);
+                    }
                 }
             }
+            
+            for(int groupid : dpData.groupMap[x][y]){
+                for(Instance* &inst : groups[groupid].instances){
+                    assert(inst->pack);
+                }
+            }
+            
         }
+    }
+    for (Instance* inst : database.instances){
+        if(inst->id==260){
+            cout<<"find"<<endl;
+        }
+        assert(inst->pack);
     }
 }
 
@@ -161,11 +185,16 @@ void DPBle::GlobalEleMove() {
     int nInOptiRgn = 0;
 
     for (auto& group : groups) {
+        if(group.id==487){
+            cout<<"find"<<endl;
+        }
         if (group.GetSiteType() == SiteType::SLICE) {
             nSliceGroup++;
             Site* curSite = database.getSite(group.x, group.y);
 
-            VPR_CLB* sourceCLB = dpData.NewCLB();
+            //VPR_CLB* sourceCLB = new VPR_CLB(dpData.packdata, curSite, 0);
+            VPR_CLB* sourceCLB = NULL;
+            //sourceCLB->index=dpData.clbMap[group.x][group.y]->index;
             vector<int> sourceGroup;
 
             Box<double> optrgn = GetOptimalRegion({group.x, group.y}, groupToNets[group.id], netBox);
@@ -173,8 +202,8 @@ void DPBle::GlobalEleMove() {
 
             if (!inOptrgn) {
                 nNotInOptiRgn++;
+                sourceCLB = dpData.NewCLB(curSite);
                 IsGroupMovable(group, sourceCLB, sourceGroup);
-
                 bool moved = false;
                 Site* candSite = NULL;
                 vector<Site*> candSites;
@@ -194,7 +223,7 @@ void DPBle::GlobalEleMove() {
                     if (candSite->pack == NULL) {  // NOTE: empty before the whole process (routing friendly..)
                                                    // if (dpData.clbMap[candSite->x][candSite->y]->IsEmpty()){
                         moved = MoveGroupToSite(candSite, group, sourceCLB, sourceGroup);
-                        if (moved) {
+                        if (moved) { 
                             nToOptNullMove++;
                             break;
                         }
@@ -222,81 +251,94 @@ void DPBle::GlobalEleMove() {
                     }
                 }
 
+                //free all data t get ready for next "remove group from cluster"
+                // dpData.packdata->intra_lb_routing.assign(dpData.packdata->num_clb,nullptr);
+                // for (int x = 0; x < database.sitemap_nx; x++) {
+                //     for (int y = 0; y < database.sitemap_ny; y++) {
+                //         delete dpData.clbMap[x][y];
+                //         dpData.clbMap[x][y]=NULL;
+                //     }
+                // }
+                // dpData.packdata->Free(VPR_Pack_Data::FREE_ALL_FOR_REPACK,0);
+                // dpData.packdata->Init();
+
                 if (moved) {
                     PartialUpdate(group, candSite);
                 } else {
-                    nChainMove += OptrgnChainMove(group);
+                    nChainMove += OptrgnChainMove(group ,sourceCLB);//resume cluster in this function
                 }
             }
-            if (sourceCLB != NULL) delete sourceCLB;
+            if (sourceCLB != NULL){//move fail!!!!!(chain move not include!)
+                dpData.DeleteCLB(sourceCLB);
+            } 
         }
     }
 
     int nOptNullMove = 0;
     int nOptMergeMove = 0;
 
-    for (auto& group : groups) {
-        if (group.GetSiteType() == SiteType::SLICE) {
-            Site* curSite = database.getSite(group.x, group.y);
+    // for (auto& group : groups) {
+    //     if (group.GetSiteType() == SiteType::SLICE) {
+    //         Site* curSite = database.getSite(group.x, group.y);
 
-            VPR_CLB* sourceCLB = dpData.NewCLB();
-            vector<int> sourceGroup;
+    //         VPR_CLB* sourceCLB = dpData.NewCLB();
+    //         vector<int> sourceGroup;
 
-            Box<double> optrgn = GetOptimalRegion({group.x, group.y}, groupToNets[group.id], netBox);
-            bool inOptrgn = ((int)optrgn.dist(curSite->cx(), curSite->cy()) == 0);
-            if (inOptrgn) {
-                nInOptiRgn++;
-                IsGroupMovable(group, sourceCLB, sourceGroup);
+    //         Box<double> optrgn = GetOptimalRegion({group.x, group.y}, groupToNets[group.id], netBox);
+    //         bool inOptrgn = ((int)optrgn.dist(curSite->cx(), curSite->cy()) == 0);
+    //         if (inOptrgn) {
+    //             nInOptiRgn++;
+    //             IsGroupMovable(group, sourceCLB, sourceGroup);
 
-                bool moved = false;
-                Site* candSite = NULL;
-                vector<Site*> candSites;
-                for (int x = optrgn.lx(); x <= (int)optrgn.ux(); x++) {
-                    for (int y = optrgn.ly(); y <= (int)optrgn.uy(); y++) {
-                        auto candSite = database.sites[x][y];
-                        if (candSite->type == curSite->type && dpData.IsClkMoveLeg(group, candSite) &&
-                            !dpData.WorsenCong(curSite, candSite)) {
-                            candSites.push_back(candSite);
-                        }
-                    }
-                }
-                SortCandSitesByAlign(group, candSites);
-                // search for null place first
-                for (unsigned s = 0; s < candSites.size(); s++) {
-                    candSite = candSites[s];
-                    if (candSite->pack == NULL) {  // NOTE: empty before the whole process (routing friendly..)
-                                                   // if (dpData.clbMap[candSite->x][candSite->y]->IsEmpty()){
-                        moved = MoveGroupToSite(candSite, group, sourceCLB, sourceGroup);
-                        if (moved) {
-                            nToOptNullMove += (!inOptrgn);
-                            nOptNullMove += inOptrgn;
-                            break;
-                        }
-                    }
-                }
-                if (!moved) {
-                    // try merge to sites in optimal region
-                    for (unsigned s = 0; s < candSites.size(); s++) {
-                        candSite = candSites[s];
-                        if (candSite->pack != NULL) {
-                            moved = MoveGroupToSite(candSite, group, sourceCLB, sourceGroup);
-                            if (moved) {
-                                nToOptMergeMove += (!inOptrgn);
-                                nOptMergeMove += inOptrgn;
-                                break;
-                            }
-                        }
-                    }
-                }
+    //             bool moved = false;
+    //             Site* candSite = NULL;
+    //             vector<Site*> candSites;
+    //             for (int x = optrgn.lx(); x <= (int)optrgn.ux(); x++) {
+    //                 for (int y = optrgn.ly(); y <= (int)optrgn.uy(); y++) {
+    //                     auto candSite = database.sites[x][y];
+    //                     if (candSite->type == curSite->type && dpData.IsClkMoveLeg(group, candSite) &&
+    //                         !dpData.WorsenCong(curSite, candSite)) {
+    //                         candSites.push_back(candSite);
+    //                     }
+    //                 }
+    //             }
+    //             SortCandSitesByAlign(group, candSites);
+    //             // search for null place first
+    //             for (unsigned s = 0; s < candSites.size(); s++) {
+    //                 candSite = candSites[s];
+    //                 if (candSite->pack == NULL) {  // NOTE: empty before the whole process (routing friendly..)
+    //                                                // if (dpData.clbMap[candSite->x][candSite->y]->IsEmpty()){
+    //                     moved = MoveGroupToSite(candSite, group, sourceGroup);
+    //                     if (moved) {
+    //                         nToOptNullMove += (!inOptrgn);
+    //                         nOptNullMove += inOptrgn;
+    //                         break;
+    //                     }
+    //                 }
+    //             }
+    //             if (!moved) {
+    //                 // try merge to sites in optimal region
+    //                 for (unsigned s = 0; s < candSites.size(); s++) {
+    //                     candSite = candSites[s];
+    //                     if (candSite->pack != NULL) {
+    //                         moved = MoveGroupToSite(candSite, group, sourceGroup);
+    //                         if (moved) {
+    //                             nToOptMergeMove += (!inOptrgn);
+    //                             nOptMergeMove += inOptrgn;
+    //                             break;
+    //                         }
+    //                     }
+    //                 }
+    //             }
 
-                if (moved) {
-                    nOptMergeMove -= (candSite == curSite);
-                    PartialUpdate(group, candSite);
-                }
-            }
-            if (sourceCLB != NULL) delete sourceCLB;
-        }
-    }
+    //             if (moved) {
+    //                 nOptMergeMove -= (candSite == curSite);
+    //                 PartialUpdate(group, candSite);
+    //             }
+    //         }
+    //         if (sourceCLB != NULL) delete sourceCLB;
+    //     }
+    // }
 
     DumpToDB();
     database.ClearEmptyPack();

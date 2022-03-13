@@ -15,7 +15,16 @@ public:
     enum Name { LUT, FF, CARRY8, DSP48E2, RAMB36E2, IO };
     static Name NameString2Enum(const string &name);
     static string NameEnum2String(const Resource::Name &name);
-
+    unordered_map<string , Resource::Name> model_name_to_resource_name{//all possible model name in vpr arch ,should update constantly
+        {"adder" , CARRY8},
+        {"multiply" , DSP48E2},
+        {"single_port_ram" , RAMB36E2},
+        {"dual_port_ram" , RAMB36E2},
+        {".input" , IO},
+        {".output" , IO},
+        {".latch" , FF},
+        {".names" , LUT}
+    };
     Name name;
     SiteType *siteType;
     vector<Master *> masters;
@@ -28,16 +37,25 @@ public:
 
 class SiteType {
 public:
-    enum Name { SLICE, DSP, BRAM, IO ,EMPTY};
+    enum Name { SLICE, DSP, BRAM, IO ,EMPTY,UNKNOWN};
     static Name NameString2Enum(const string &name);
     static string NameEnum2String(const SiteType::Name &name);
+    unordered_map<string , SiteType::Name> tile_name_to_sitetype_name{
+        {"clb" , SLICE},
+        {"mult_36" , DSP},
+        {"memory" , BRAM},
+        {"io" , IO},
+        {"EMPTY" , EMPTY}
+    };
 
     int id;
     Name name;
-    vector<Resource *> resources;
+    t_physical_tile_type_ptr physical_tile;
+    //vector<Resource *> resources;
 
     SiteType(Name n);
     SiteType(const SiteType &sitetype);
+    SiteType(const t_physical_tile_type* tile_type);
 
     void addResource(Resource *resource);
     void addResource(Resource *resource, int count);

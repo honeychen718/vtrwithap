@@ -66,24 +66,44 @@ SiteType::SiteType(Name n) { this->name = n; }
 
 SiteType::SiteType(const SiteType &sitetype) {
     name = sitetype.name;
-    resources = sitetype.resources;
+    //resources = sitetype.resources;
+}
+SiteType::SiteType(const t_physical_tile_type* tile_type){
+    auto iter = tile_name_to_sitetype_name.find(string(tile_type->name));
+    if(iter != tile_name_to_sitetype_name.end()){
+        this->name = iter->second;
+    }else{
+        this->name = UNKNOWN;
+    }
+
+    this->physical_tile = tile_type;
 }
 
 void SiteType::addResource(Resource *resource) {
-    resources.push_back(resource);
-    resource->siteType = this;
+    // resources.push_back(resource);
+    // resource->siteType = this;
+    assert(0);
 }
 void SiteType::addResource(Resource *resource, int count) {
-    for (int i = 0; i < count; i++) {
-        addResource(resource);
-    }
+    // for (int i = 0; i < count; i++) {
+    //     addResource(resource);
+    // }
+    assert(0);
 }
 
 bool SiteType::matchInstance(Instance *instance) {
-    for (auto r : resources) {
-        if (instance->master->resource == r) {
-            return true;
+    auto iter = database.primitive_candidate_block_types.find(instance->master->vpr_model);
+    if(iter != database.primitive_candidate_block_types.end()){
+        auto& logical_block_types = iter->second;
+        for(auto type:logical_block_types){
+            for(auto tile : type->equivalent_tiles){
+                if(tile == this->physical_tile){
+                    return true;
+                }
+            }
         }
+    }else{
+        assert(0);
     }
     return false;
 }
@@ -121,7 +141,7 @@ Pack::Pack() {
 }
 
 Pack::Pack(SiteType *sitetype) {
-    this->instances.resize(sitetype->resources.size(), NULL);
+    //this->instances.resize(sitetype->resources.size(), NULL);
     this->type = sitetype;
     this->site = NULL;
 }

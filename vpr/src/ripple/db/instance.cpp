@@ -56,6 +56,53 @@ Master::Master(const Master &master) {
     }
 }
 
+Master::Master(const t_model* model){
+    string model_name = model->name;
+    auto iter = model_name_to_master_name.find(model_name);
+    if(iter != model_name_to_master_name.end()){
+        this->name = iter->second;
+    }else{
+        this->name = Master::UNKNOWN;
+    }
+    this->resource = NULL;
+    this->vpr_model = model;
+
+    const t_model_ports* cur_port;
+    cur_port = model->outputs;
+    VTR_ASSERT(model->name && model->name != ".names");
+    while (cur_port) {
+        string cur_port_name = cur_port->name;
+        for (int pini = 0; pini < cur_port->size; pini++) {
+            RipplePinType pintype(cur_port_name + "[" + to_string(pini) + "]", 'o');
+            this->addPin(pintype);
+        }
+        cur_port = cur_port->next;
+    }
+    cur_port = model->inputs;
+    while (cur_port) {
+        string cur_port_name = cur_port->name;
+        char type = (cur_port->is_clock) ? 'c' : 'i';
+        for (int pini = 0; pini < cur_port->size; pini++) {
+            RipplePinType pintype(cur_port_name + "[" + to_string(pini) + "]", type);
+            this->addPin(pintype);
+        }
+        cur_port = cur_port->next;
+    }
+}
+
+Master::Master(const t_model* model , int num_input_pins){
+    VTR_ASSERT((string)model->name == ".names");
+    this->name = lut_master_names[num_input_pins-1];
+    this->resource = NULL;
+    this->vpr_model = model;
+    RipplePinType pintype("out[0]", 'o');
+    this->addPin(pintype);
+    for (int j = 0; j < num_input_pins; j++) {
+        RipplePinType pintype("in[" + to_string(j) + "]", 'i');
+        this->addPin(pintype);
+    }
+}
+
 Master::~Master() {
     for (int i = 0; i < (int)pins.size(); i++) {
         delete pins[i];
@@ -78,7 +125,7 @@ Instance::Instance() {
     id = -1;
     master = NULL;
     pack = NULL;
-    slot = -1;
+    //slot = -1;
     fixed = false;
     inputFixed = false;
 }
@@ -88,7 +135,7 @@ Instance::Instance(const string &name, Master *master) {
     this->name = name;
     this->master = master;
     this->pack = NULL;
-    this->slot = -1;
+    //this->slot = -1;
     this->fixed = false;
     this->inputFixed = false;
     this->pins.resize(master->pins.size());
@@ -103,7 +150,7 @@ Instance::Instance(const Instance &instance) {
     name = instance.name;
     master = instance.master;
     pack = NULL;
-    slot = -1;
+    //slot = -1;
     fixed = instance.fixed;
     inputFixed = instance.inputFixed;
     pins.resize(instance.pins.size());
@@ -119,7 +166,7 @@ Instance::Instance(const string &name, Master *master,AtomBlockId &vpratomblkid)
     this->name = name;
     this->master = master;
     this->pack = NULL;
-    this->slot = -1;
+    //this->slot = -1;
     this->fixed = false;
     this->inputFixed = false;
     this->pins.resize(master->pins.size());

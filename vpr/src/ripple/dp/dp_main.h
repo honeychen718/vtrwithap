@@ -53,7 +53,7 @@ private:
     void SortCandSitesByDisp(Group& group, vector<Site*>& candSites);
 
     Site* MoveTowardOptrgn(Group& group, Box<double>& optrgn, VPR_CLB*& sourceCLB, vector<int>& sourceGroup);
-    bool OptrgnChainMove(Group& group);
+    bool OptrgnChainMove(Group& group ,VPR_CLB*& srcCLB);
     void GlobalEleSwap();
     void GlobalEleMove();
 
